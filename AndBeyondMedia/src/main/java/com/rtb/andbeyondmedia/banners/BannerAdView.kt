@@ -106,7 +106,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     override fun loadAd(request: AdRequest): Boolean {
         val adRequest = request.getAdRequest() ?: return false
         fun load() {
-            if (this::adView.isInitialized) adView.loadAd(adRequest)
+            if (this::adView.isInitialized) {
+                bannerManager.fetchDemand(firstLook) { adView.loadAd(adRequest) }
+            }
         }
         if (firstLook) bannerManager.shouldSetConfig {
             if (it) bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)

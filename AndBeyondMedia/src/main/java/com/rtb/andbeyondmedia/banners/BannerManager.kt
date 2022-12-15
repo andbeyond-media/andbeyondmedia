@@ -215,7 +215,7 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
             loadAd(active)
         }
         if (forced || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))
-                        && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook) bannerConfig.minView else bannerConfig.minViewRtb)))
+                        && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb)))
         ) {
             refreshAd()
         } else {
@@ -230,15 +230,24 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
             addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
         }.build()
         bannerConfig.refreshCount++
-        bannerConfig.placement?.let {
-            if (bannerConfig.adSizes.isNotEmpty()) {
-                val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
-                val firstAdSize = totalSizes[0]
-                val adUnit = BannerAdUnit(if (wasFirstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.width)
-                totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
-                adUnit.fetchDemand { _, _ -> bannerListener.loadAd(adRequest) }
-            }
-        } ?: bannerListener.loadAd(adRequest)
+        bannerListener.loadAd(adRequest)
+    }
+
+    fun fetchDemand(firstLook: Boolean, callback: () -> Unit) {
+        if (((firstLook || bannerConfig.isNewUnit) && sdkConfig?.prebid?.firstLook == 1) || (!firstLook && sdkConfig?.prebid?.other == 1)) {
+            bannerConfig.placement?.let {
+                if (bannerConfig.adSizes.isNotEmpty()) {
+                    val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
+                    val firstAdSize = totalSizes[0]
+                    val adUnit = BannerAdUnit(if (firstLook || bannerConfig.isNewUnit) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.width)
+                    totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
+                    adUnit.addContextData("hb_format", "amp")
+                    adUnit.fetchDemand { _, _ -> callback() }
+                }
+            } ?: callback()
+        } else {
+            callback()
+        }
     }
 
     private fun getAdUnitName(forced: Boolean) = String.format("%s-%d", bannerConfig.customUnitName, if (forced) bannerConfig.unFilled?.number else bannerConfig.position)

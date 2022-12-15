@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.work.*
+import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
@@ -41,7 +42,7 @@ object AndBeyondMedia {
         workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
         workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
             if (it.state == WorkInfo.State.SUCCEEDED) {
-                PrebidManager.initialize(context)
+                SDKManager.initialize(context)
             }
         }
     }
@@ -89,7 +90,7 @@ internal class ConfigSetWorker(context: Context, params: WorkerParameters) : Wor
     }
 }
 
-internal object PrebidManager : KoinComponent {
+internal object SDKManager : KoinComponent {
 
     fun initialize(context: Context) {
         val storeService: StoreService by inject()
@@ -106,6 +107,13 @@ internal object PrebidManager : KoinComponent {
                 Log.e(TAG, error?.error ?: "")
             }
         })
+        initializeGAM(context)
+    }
+
+    private fun initializeGAM(context: Context) {
+        MobileAds.initialize(context) {
+            Log.i(TAG, "GAM Initialization complete.")
+        }
     }
 }
 
