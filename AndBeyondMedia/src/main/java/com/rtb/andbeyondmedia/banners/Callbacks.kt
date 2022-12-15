@@ -3,7 +3,7 @@ package com.rtb.andbeyondmedia.banners
 import com.google.android.gms.ads.AdSize
 import com.rtb.andbeyondmedia.common.AdRequest
 
-internal interface AdManagerListener {
+internal interface BannerManagerListener {
     fun attachAdView(adUnitId: String, adSizes: List<AdSize>)
 
     fun loadAd(request: AdRequest): Boolean

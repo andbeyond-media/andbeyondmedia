@@ -3,10 +3,10 @@ package com.rtb.andbeyondmedia
 import android.os.Bundle
 import android.util.DisplayMetrics
 import androidx.appcompat.app.AppCompatActivity
-import com.rtb.andbeyondmedia.banners.AdTypes
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
