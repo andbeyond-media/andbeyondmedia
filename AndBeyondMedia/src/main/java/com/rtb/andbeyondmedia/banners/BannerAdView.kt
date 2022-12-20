@@ -9,20 +9,20 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import java.util.*
 
-class BannerAdView : LinearLayout, AdManagerListener {
+class BannerAdView : LinearLayout, BannerManagerListener {
 
     private lateinit var mContext: Context
     private lateinit var binding: BannerAdViewBinding
     private lateinit var adView: AdManagerAdView
-    private lateinit var adManager: BannerManager
+    private lateinit var bannerManager: BannerManager
     private var adType: String = AdTypes.OTHER
     private lateinit var currentAdUnit: String
     private lateinit var currentAdSizes: List<AdSize>
-    private var isFirstLoad = true
-    private var config: Config? = null
+    private var firstLook = true
     private var bannerAdListener: BannerAdListener? = null
 
     constructor(context: Context) : super(context) {
@@ -43,7 +43,7 @@ class BannerAdView : LinearLayout, AdManagerListener {
 
     private fun init(context: Context, attrs: AttributeSet?) {
         this.mContext = context
-        adManager = BannerManager(mContext, this)
+        bannerManager = BannerManager(this)
         val view = inflate(context, R.layout.banner_ad_view, this)
         binding = BannerAdViewBinding.bind(view)
         attrs?.let {
@@ -53,14 +53,11 @@ class BannerAdView : LinearLayout, AdManagerListener {
                 var adSizes = getString(R.styleable.BannerAdView_adSizes) ?: ""
                 adType = getString(R.styleable.BannerAdView_adType) ?: AdTypes.OTHER
                 if (!adSizes.contains(adSize)) {
-                    adSizes = if (adSizes.isNotEmpty()) {
-                        String.format(Locale.ENGLISH, "%s,%s", adSizes, adSize)
-                    } else {
-                        adSize
-                    }
+                    adSizes = if (adSizes.isEmpty()) adSize
+                    else String.format(Locale.ENGLISH, "%s,%s", adSizes, adSize)
                 }
                 if (adUnitId.isNotEmpty() && adSizes.isNotEmpty()) {
-                    attachAdView(adUnitId, adManager.getSize(adSizes))
+                    attachAdView(adUnitId, bannerManager.convertStringSizesToAdSizes(adSizes))
                 }
             }
         }
@@ -81,18 +78,10 @@ class BannerAdView : LinearLayout, AdManagerListener {
     fun setAdSize(adSize: BannerAdSize) = setAdSizes(adSize)
 
     fun setAdSizes(vararg adSizes: BannerAdSize) {
-        this.currentAdSizes = getProperAdSizes(*adSizes)
+        this.currentAdSizes = bannerManager.convertVaragsToAdSizes(*adSizes)
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
             attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
         }
-    }
-
-    private fun getProperAdSizes(vararg adSizes: BannerAdSize): ArrayList<AdSize> {
-        val adSizeList = arrayListOf<AdSize>()
-        adSizes.toList().forEach {
-            adSizeList.add(it.adSize)
-        }
-        return adSizeList
     }
 
 
@@ -115,47 +104,47 @@ class BannerAdView : LinearLayout, AdManagerListener {
     }
 
     override fun loadAd(request: AdRequest): Boolean {
-        val adRequest = request.getAdRequest() ?: return false
+        var adRequest = request.getAdRequest() ?: return false
         fun load() {
             if (this::adView.isInitialized) {
-                adView.loadAd(adRequest)
+                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
             }
         }
-        if (isFirstLoad && this::currentAdSizes.isInitialized) {
-            adManager.fetchConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType) {
-                this.config = it
+        if (firstLook) {
+            bannerManager.shouldSetConfig {
+                if (it) {
+                    bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                    adRequest = bannerManager.checkOverride() ?: adRequest
+                }
                 load()
             }
-        } else {
-            load()
-        }
+        } else load()
         return true
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        adManager.saveVisibility(isVisible)
+        bannerManager.saveVisibility(isVisible)
     }
 
     private val adListener = object : AdListener() {
         override fun onAdClicked() {
-            bannerAdListener?.onAdClicked()
             super.onAdClicked()
+            bannerManager.clearConfig()
+            bannerAdListener?.onAdClicked()
         }
 
         override fun onAdClosed() {
-            bannerAdListener?.onAdClosed()
             super.onAdClosed()
+            bannerAdListener?.onAdClosed()
         }
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
-            bannerAdListener?.onAdFailedToLoad(p0.toString())
             super.onAdFailedToLoad(p0)
-            if (isFirstLoad) {
-                isFirstLoad = false
-                if (config?.hijack?.status == 1) {
-                    adManager.refresh(forced = true)
-                }
+            bannerAdListener?.onAdFailedToLoad(p0.toString())
+            if (firstLook) {
+                firstLook = false
+                bannerManager.adFailedToLoad()
             }
         }
 
@@ -165,13 +154,11 @@ class BannerAdView : LinearLayout, AdManagerListener {
         }
 
         override fun onAdLoaded() {
-            bannerAdListener?.onAdLoaded()
             super.onAdLoaded()
-            if (config?.refresh == 1) {
-                adManager.startRefreshing(resetVisibleTime = true, isPublisherLoad = isFirstLoad)
-            }
-            if (isFirstLoad) {
-                isFirstLoad = false
+            bannerAdListener?.onAdLoaded()
+            bannerManager.adLoaded(firstLook)
+            if (firstLook) {
+                firstLook = false
             }
         }
 
@@ -183,16 +170,16 @@ class BannerAdView : LinearLayout, AdManagerListener {
 
     fun pauseAd() {
         adView.pause()
-        adManager.adPaused()
+        bannerManager.adPaused()
     }
 
     fun resumeAd() {
         adView.resume()
-        adManager.adResumed()
+        bannerManager.adResumed()
     }
 
     fun destroyAd() {
         adView.destroy()
-        adManager.adDestroyed()
+        bannerManager.adDestroyed()
     }
 }

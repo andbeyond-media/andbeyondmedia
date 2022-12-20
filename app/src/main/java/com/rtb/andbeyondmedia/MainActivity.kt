@@ -3,10 +3,10 @@ package com.rtb.andbeyondmedia
 import android.os.Bundle
 import android.util.DisplayMetrics
 import androidx.appcompat.app.AppCompatActivity
-import com.rtb.andbeyondmedia.banners.AdTypes
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -16,11 +16,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         loadAd()
-        loadAdaptiveAd()
+        //loadAdaptiveAd()
     }
 
     private fun loadAd() {
-        val adRequest = AdRequest().Builder().build()
+        val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
     }
 
@@ -68,4 +68,20 @@ class MainActivity : AppCompatActivity() {
             val adWidth = (adWidthPixels / density).toInt()
             return BannerAdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
         }
+
+
+    override fun onResume() {
+        super.onResume()
+        binding.bannerAd.resumeAd()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.bannerAd.pauseAd()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        binding.bannerAd.destroyAd()
+    }
 }
