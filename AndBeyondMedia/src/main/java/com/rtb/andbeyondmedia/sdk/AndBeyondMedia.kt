@@ -71,12 +71,12 @@ internal val sdkModule = module {
     }
 }
 
-internal class ConfigSetWorker(context: Context, params: WorkerParameters) : Worker(context, params), KoinComponent {
+internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : Worker(context, params), KoinComponent {
     override fun doWork(): Result {
         return try {
             val storeService: StoreService by inject()
             val configService: ConfigService by inject()
-            val response = configService.getConfig(hashMapOf()).execute()
+            val response = configService.getConfig(hashMapOf("Name" to context.packageName)).execute()
             if (response.isSuccessful && response.body() != null) {
                 storeService.config = response.body()
                 Result.success()

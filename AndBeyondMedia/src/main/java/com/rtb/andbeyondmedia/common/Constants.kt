@@ -3,8 +3,7 @@ package com.rtb.andbeyondmedia.common
 internal const val TAG = "Ads"
 
 internal object URLs {
-    const val BASE_URL = "http://13.228.193.15/"
-    // const val BASE_URL = "https://prebid.andbeyond.media/"
+     const val BASE_URL = "https://prebid.andbeyond.media/"
 }
 
 object AdTypes {
