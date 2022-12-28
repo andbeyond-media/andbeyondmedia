@@ -98,6 +98,10 @@ internal data class SDKConfig(
             val adaptive: LoadConfig? = null,
             @SerializedName("INLINE")
             val inline: LoadConfig? = null,
+            @SerializedName("INREAD")
+            val inread: LoadConfig? = null,
+            @SerializedName("STICKY")
+            val sticky: LoadConfig? = null,
             @SerializedName("ALL")
             val other: LoadConfig? = null
     )

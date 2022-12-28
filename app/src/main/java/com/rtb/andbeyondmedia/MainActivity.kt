@@ -8,21 +8,41 @@ import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.ActivityMainBinding
+import com.rtb.andbeyondmedia.intersitial.InterstitialAd
+import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
+    private var interstitialAd: InterstitialAd? = null
+    private var rewardedInterstitialAd: RewardedInterstitialAd? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         loadAd()
-        //loadAdaptiveAd()
+        loadInterstitial()
+        loadAdaptiveAd()
+        binding.showInterstitial.setOnClickListener { interstitialAd?.show() }
     }
 
     private fun loadAd() {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
     }
+
+
+    private fun loadInterstitial() {
+        interstitialAd = InterstitialAd(this, "/6499/example/interstitial")
+        interstitialAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
+            binding.showInterstitial.isEnabled = it
+        }
+    }
+
+    private fun loadInterstitialRewarded() {
+        rewardedInterstitialAd = RewardedInterstitialAd(this, "/21775744923/example/rewarded_interstitial")
+        rewardedInterstitialAd?.load(AdRequest().Builder().build()) {}
+    }
+
 
     private fun loadAdaptiveAd() {
         val adView = BannerAdView(this)

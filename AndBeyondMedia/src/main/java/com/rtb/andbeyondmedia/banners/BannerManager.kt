@@ -124,12 +124,18 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
     }
 
     private fun getValidLoadConfig(adType: String, forHijack: Boolean): SDKConfig.LoadConfig? {
-        return when {
+        var validConfig = when {
             adType.equals(AdTypes.BANNER, true) -> if (forHijack) sdkConfig?.hijackConfig?.banner else sdkConfig?.unfilledConfig?.banner
             adType.equals(AdTypes.INLINE, true) -> if (forHijack) sdkConfig?.hijackConfig?.inline else sdkConfig?.unfilledConfig?.inline
             adType.equals(AdTypes.ADAPTIVE, true) -> if (forHijack) sdkConfig?.hijackConfig?.adaptive else sdkConfig?.unfilledConfig?.adaptive
+            adType.equals(AdTypes.INREAD, true) -> if (forHijack) sdkConfig?.hijackConfig?.inread else sdkConfig?.unfilledConfig?.inread
+            adType.equals(AdTypes.STICKY, true) -> if (forHijack) sdkConfig?.hijackConfig?.sticky else sdkConfig?.unfilledConfig?.sticky
             else -> if (forHijack) sdkConfig?.hijackConfig?.other else sdkConfig?.unfilledConfig?.other
         }
+        if (validConfig == null) {
+            validConfig = if (forHijack) sdkConfig?.hijackConfig?.other else sdkConfig?.unfilledConfig?.other
+        }
+        return validConfig
     }
 
     private fun getCustomSizes(adSizes: ArrayList<AdSize>, sizeOptions: List<SDKConfig.Size>): List<AdSize> {
@@ -229,6 +235,7 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
         addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
+        addCustomTargeting("hb_format", "amp")
     }.build()
 
     private fun loadAd(active: Int) {
@@ -237,8 +244,11 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
     }
 
     fun checkOverride(): AdManagerAdRequest? {
-        if ((bannerConfig.isNewUnit && bannerConfig.newUnit?.status == 1) || bannerConfig.hijack?.status == 1) {
-            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true), bannerConfig.adSizes)
+        if (bannerConfig.isNewUnit && bannerConfig.newUnit?.status == 1) {
+            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = false, newUnit = true), bannerConfig.adSizes)
+            return createRequest(1).getAdRequest()
+        } else if (bannerConfig.hijack?.status == 1) {
+            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes)
             return createRequest(1).getAdRequest()
         }
         return null
@@ -260,8 +270,8 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
         }
     }
 
-    private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean): String {
-        return String.format("%s-%d", bannerConfig.customUnitName, if (unfilled) bannerConfig.unFilled?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
+    private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
+        return String.format("%s-%d", bannerConfig.customUnitName, if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
     }
 
     fun adPaused() {
