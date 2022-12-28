@@ -21,10 +21,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         loadAd()
         loadInterstitial()
-        loadInterstitialRewarded()
-        //loadAdaptiveAd()
-
-        binding.showInterstitial.setOnClickListener { }
+        loadAdaptiveAd()
+        binding.showInterstitial.setOnClickListener { interstitialAd?.show() }
     }
 
     private fun loadAd() {
@@ -42,9 +40,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadInterstitialRewarded() {
         rewardedInterstitialAd = RewardedInterstitialAd(this, "/21775744923/example/rewarded_interstitial")
-        rewardedInterstitialAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
-
-        }
+        rewardedInterstitialAd?.load(AdRequest().Builder().build()) {}
     }
 
 

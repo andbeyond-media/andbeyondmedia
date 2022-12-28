@@ -134,7 +134,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
 
     private fun createRequest() = AdRequest().Builder().apply {
         addCustomTargeting("adunit", adUnit)
-        addCustomTargeting("hb_format", "amp")
+        addCustomTargeting("hb_format", "video")
     }.build()
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {

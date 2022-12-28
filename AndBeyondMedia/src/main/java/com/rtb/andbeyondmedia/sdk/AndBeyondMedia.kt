@@ -9,7 +9,6 @@ import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -57,11 +56,10 @@ internal val sdkModule = module {
     }
 
     single {
-        val bodyInterceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
-        OkHttpClient.Builder().addInterceptor(bodyInterceptor)
+        OkHttpClient.Builder()
                 .connectTimeout(3, TimeUnit.SECONDS)
                 .writeTimeout(3, TimeUnit.SECONDS)
-                .readTimeout(3, TimeUnit.SECONDS).build()
+                .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
     }
 
     single {
@@ -73,19 +71,23 @@ internal val sdkModule = module {
 
 internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : Worker(context, params), KoinComponent {
     override fun doWork(): Result {
+        val storeService: StoreService by inject()
         return try {
-            val storeService: StoreService by inject()
             val configService: ConfigService by inject()
             val response = configService.getConfig(hashMapOf("Name" to context.packageName)).execute()
             if (response.isSuccessful && response.body() != null) {
                 storeService.config = response.body()
                 Result.success()
             } else {
-                Result.failure()
+                storeService.config?.let {
+                    Result.success()
+                } ?: Result.failure()
             }
         } catch (e: Exception) {
             Log.e(TAG, e.message ?: "")
-            Result.failure()
+            storeService.config?.let {
+                Result.success()
+            } ?: Result.failure()
         }
     }
 }
