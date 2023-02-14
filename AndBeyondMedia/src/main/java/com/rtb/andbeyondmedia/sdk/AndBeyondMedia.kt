@@ -8,6 +8,8 @@ import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.component.KoinComponent
@@ -92,6 +94,36 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
     }
 }
 
+internal class PrebidWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
+    override suspend fun doWork(): Result {
+        withContext(Dispatchers.Main) {
+            return@withContext try {
+                val storeService: StoreService by inject()
+                val config = storeService.config
+                if (config != null && config.switch == 1) {
+                    PrebidMobile.setPrebidServerHost(Host.createCustomHost(config.prebid?.host ?: ""))
+                    PrebidMobile.setPrebidServerAccountId(config.prebid?.accountId ?: "")
+                    PrebidMobile.initializeSdk(context, object : SdkInitializationListener {
+                        override fun onSdkInit() {
+                            Log.i(TAG, "Prebid Initialized")
+                        }
+
+                        override fun onSdkFailedToInit(error: InitError?) {
+                            Log.e(TAG, error?.error ?: "")
+                        }
+                    })
+                }
+                Result.success()
+            } catch (e: Exception) {
+                Log.e(TAG, e.message ?: "")
+                Result.failure()
+            }
+        }
+        return Result.success()
+    }
+
+}
+
 internal object SDKManager : KoinComponent {
 
     fun initialize(context: Context) {
@@ -135,4 +167,8 @@ internal class StoreService(private val prefs: SharedPreferences) {
         set(value) = prefs.edit().apply {
             value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
         }.apply()
+
+    var prebidPending: Boolean
+        get() = prefs.getBoolean("PREBID_PENDING", false)
+        set(value) = prefs.edit().putBoolean("PREBID_PENDING", value).apply()
 }

@@ -1,5 +1,6 @@
 package com.rtb.andbeyondmedia.common
 
+import android.annotation.SuppressLint
 import android.text.TextUtils
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 
@@ -15,6 +16,7 @@ class AdRequest {
         }
     }
 
+    @SuppressLint("VisibleForTests")
     inner class Builder {
         private val requestBuilder: AdManagerAdRequest.Builder = AdManagerAdRequest.Builder()
 

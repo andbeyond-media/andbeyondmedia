@@ -20,8 +20,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         loadAd()
-        loadInterstitial()
-        loadAdaptiveAd()
+        /*loadInterstitial()
+        loadAdaptiveAd()*/
         binding.showInterstitial.setOnClickListener { interstitialAd?.show() }
     }
 
