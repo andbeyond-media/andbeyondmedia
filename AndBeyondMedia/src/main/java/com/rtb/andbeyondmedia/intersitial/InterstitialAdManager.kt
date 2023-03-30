@@ -110,7 +110,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.INTER || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.INTERSTITIAL || config.type == "all" }
         if (validConfig == null) {
             shouldBeActive = false
             return

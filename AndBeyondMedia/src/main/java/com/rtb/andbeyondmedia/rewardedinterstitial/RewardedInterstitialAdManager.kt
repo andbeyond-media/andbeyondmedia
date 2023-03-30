@@ -111,7 +111,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARD || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDEDINTERSTITIAL || config.type == "all" }
         if (validConfig == null) {
             shouldBeActive = false
             return

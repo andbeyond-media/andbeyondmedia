@@ -11,6 +11,7 @@ import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -58,7 +59,8 @@ internal val sdkModule = module {
     }
 
     single {
-        OkHttpClient.Builder()
+        val bodyInterceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+        OkHttpClient.Builder().addInterceptor(bodyInterceptor)
                 .connectTimeout(3, TimeUnit.SECONDS)
                 .writeTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
@@ -76,7 +78,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
         val storeService: StoreService by inject()
         return try {
             val configService: ConfigService by inject()
-            val response = configService.getConfig(hashMapOf("Name" to context.packageName)).execute()
+            val response = configService.getConfig(hashMapOf("name" to context.packageName)).execute()
             if (response.isSuccessful && response.body() != null) {
                 storeService.config = response.body()
                 Result.success()

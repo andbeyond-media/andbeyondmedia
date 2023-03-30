@@ -260,7 +260,7 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
                 if (bannerConfig.adSizes.isNotEmpty()) {
                     val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
                     val firstAdSize = totalSizes[0]
-                    val adUnit = BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.width)
+                    val adUnit = BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height)
                     totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
                     adUnit.fetchDemand(adRequest) { callback() }
                 }
