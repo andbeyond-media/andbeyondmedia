@@ -111,7 +111,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDV || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDED || config.type == "all" }
         if (validConfig == null) {
             shouldBeActive = false
             return

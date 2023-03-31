@@ -8,7 +8,10 @@ import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -56,7 +59,8 @@ internal val sdkModule = module {
     }
 
     single {
-        OkHttpClient.Builder()
+        val bodyInterceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+        OkHttpClient.Builder().addInterceptor(bodyInterceptor)
                 .connectTimeout(3, TimeUnit.SECONDS)
                 .writeTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
@@ -74,7 +78,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
         val storeService: StoreService by inject()
         return try {
             val configService: ConfigService by inject()
-            val response = configService.getConfig(hashMapOf("Name" to context.packageName)).execute()
+            val response = configService.getConfig(hashMapOf("name" to context.packageName)).execute()
             if (response.isSuccessful && response.body() != null) {
                 storeService.config = response.body()
                 Result.success()
@@ -90,6 +94,36 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
             } ?: Result.failure()
         }
     }
+}
+
+internal class PrebidWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params), KoinComponent {
+    override suspend fun doWork(): Result {
+        withContext(Dispatchers.Main) {
+            return@withContext try {
+                val storeService: StoreService by inject()
+                val config = storeService.config
+                if (config != null && config.switch == 1) {
+                    PrebidMobile.setPrebidServerHost(Host.createCustomHost(config.prebid?.host ?: ""))
+                    PrebidMobile.setPrebidServerAccountId(config.prebid?.accountId ?: "")
+                    PrebidMobile.initializeSdk(context, object : SdkInitializationListener {
+                        override fun onSdkInit() {
+                            Log.i(TAG, "Prebid Initialized")
+                        }
+
+                        override fun onSdkFailedToInit(error: InitError?) {
+                            Log.e(TAG, error?.error ?: "")
+                        }
+                    })
+                }
+                Result.success()
+            } catch (e: Exception) {
+                Log.e(TAG, e.message ?: "")
+                Result.failure()
+            }
+        }
+        return Result.success()
+    }
+
 }
 
 internal object SDKManager : KoinComponent {
@@ -135,4 +169,8 @@ internal class StoreService(private val prefs: SharedPreferences) {
         set(value) = prefs.edit().apply {
             value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
         }.apply()
+
+    var prebidPending: Boolean
+        get() = prefs.getBoolean("PREBID_PENDING", false)
+        set(value) = prefs.edit().putBoolean("PREBID_PENDING", value).apply()
 }
