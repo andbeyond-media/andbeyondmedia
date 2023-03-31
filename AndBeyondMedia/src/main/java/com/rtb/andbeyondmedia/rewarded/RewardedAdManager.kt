@@ -93,8 +93,8 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
         } else {
             val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
             workerData.observeForever(object : Observer<WorkInfo> {
-                override fun onChanged(workInfo: WorkInfo?) {
-                    if (workInfo == null || (workInfo.state != WorkInfo.State.RUNNING && workInfo.state != WorkInfo.State.ENQUEUED)) {
+                override fun onChanged(value: WorkInfo) {
+                    if (value.state != WorkInfo.State.RUNNING && value.state != WorkInfo.State.ENQUEUED) {
                         workerData.removeObserver(this)
                         sdkConfig = storeService.config
                         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)

@@ -8,3 +8,8 @@ plugins {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+ext {
+    appcompat = "androidx.appcompat:appcompat:1.5.1"
+    playServicesAds = "com.google.android.gms:play-services-ads:21.5.0"
+}
