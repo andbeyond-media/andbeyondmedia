@@ -50,8 +50,6 @@ dependencies {
     implementation 'org.prebid:prebid-mobile-sdk:2.0.4'
     //noinspection GradleDependency
     implementation 'androidx.work:work-runtime-ktx:2.7.1'
-    //noinspection GradleDependency
-    //implementation "io.insert-koin:koin-android:$koin_android_version"
 
 }
 
@@ -60,7 +58,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.andbeyond-media'
             artifactId = 'andbeyondmedia'
-            version = '1.0.2'
+            version = '1.0.3'
 
             afterEvaluate {
                 from components.release
