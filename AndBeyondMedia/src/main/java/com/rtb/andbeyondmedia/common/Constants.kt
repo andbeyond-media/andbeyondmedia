@@ -1,6 +1,6 @@
 package com.rtb.andbeyondmedia.common
 
-internal const val TAG = "Okhttp"
+const val TAG = "Ads"
 
 internal object URLs {
      const val BASE_URL = "https://prebid.andbeyond.media/"

@@ -82,11 +82,11 @@ internal data class SDKConfig(
     )
 
     data class LoadConfigs(
-            @SerializedName("INTER")
+            @SerializedName("INTERSTITIAL")
             val inter: LoadConfig? = null,
-            @SerializedName("REWARD")
+            @SerializedName("REWARDEDINTERSTITIAL")
             val reward: LoadConfig? = null,
-            @SerializedName("REWARDV")
+            @SerializedName("REWARDED")
             val rewardVideos: LoadConfig? = null,
             @SerializedName("NATIVE")
             val native: LoadConfig? = null,
