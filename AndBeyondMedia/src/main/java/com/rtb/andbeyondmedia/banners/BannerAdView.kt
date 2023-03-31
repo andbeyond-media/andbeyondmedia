@@ -43,7 +43,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     private fun init(context: Context, attrs: AttributeSet?) {
         this.mContext = context
-        bannerManager = BannerManager(this)
+        bannerManager = BannerManager(context, this)
         val view = inflate(context, R.layout.banner_ad_view, this)
         binding = BannerAdViewBinding.bind(view)
         attrs?.let {

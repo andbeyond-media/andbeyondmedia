@@ -4,7 +4,6 @@ import android.app.Activity
 import android.util.Log
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.rewarded.RewardedAd
@@ -13,19 +12,17 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
+import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
-import com.rtb.andbeyondmedia.sdk.StoreService
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 import org.prebid.mobile.RewardedVideoAdUnit
 
-internal class RewardedAdManager(private val context: Activity, private val adUnit: String) : KoinComponent {
+internal class RewardedAdManager(private val context: Activity, private val adUnit: String) {
 
     private var sdkConfig: SDKConfig? = null
     private var config: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
-    private val storeService: StoreService by inject()
+    private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
 
     init {
@@ -86,7 +83,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
     }
 
     private fun shouldSetConfig(callback: (Boolean) -> Unit) {
-        val workManager: WorkManager by inject()
+        val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)

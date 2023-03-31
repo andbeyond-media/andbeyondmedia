@@ -1,23 +1,21 @@
 package com.rtb.andbeyondmedia.banners
 
+import android.content.Context
 import android.os.CountDownTimer
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
-import com.rtb.andbeyondmedia.sdk.StoreService
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 import org.prebid.mobile.BannerAdUnit
 import java.util.*
 import kotlin.math.ceil
 
-internal class BannerManager(private val bannerListener: BannerManagerListener) : KoinComponent {
+internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener) {
 
     private var activeTimeCounter: CountDownTimer? = null
     private var passiveTimeCounter: CountDownTimer? = null
@@ -25,7 +23,7 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
     private var sdkConfig: SDKConfig? = null
     private var shouldBeActive: Boolean = false
     private var wasFirstLook = true
-    private val storeService: StoreService by inject()
+    private val storeService = AndBeyondMedia.getStoreService(context)
 
     init {
         sdkConfig = storeService.config
@@ -64,12 +62,11 @@ internal class BannerManager(private val bannerListener: BannerManagerListener) 
     }
 
     fun clearConfig() {
-        val storeService: StoreService by inject()
         storeService.config = null
     }
 
     fun shouldSetConfig(callback: (Boolean) -> Unit) {
-        val workManager: WorkManager by inject()
+        val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)

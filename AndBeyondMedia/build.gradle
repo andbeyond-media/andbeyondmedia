@@ -37,7 +37,6 @@ android {
 ext {
     retrofit = "2.9.0"
     okhttp = '5.0.0-alpha.9'
-    koin_android_version = "3.3.3"
 }
 
 dependencies {
@@ -52,7 +51,7 @@ dependencies {
     //noinspection GradleDependency
     implementation 'androidx.work:work-runtime-ktx:2.7.1'
     //noinspection GradleDependency
-    implementation "io.insert-koin:koin-android:$koin_android_version"
+    //implementation "io.insert-koin:koin-android:$koin_android_version"
 
 }
 
