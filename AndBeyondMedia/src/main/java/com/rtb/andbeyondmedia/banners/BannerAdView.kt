@@ -2,19 +2,15 @@ package com.rtb.andbeyondmedia.banners
 
 import android.content.Context
 import android.util.AttributeSet
-import android.util.Log
 import android.widget.LinearLayout
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdView
-import com.google.gson.Gson
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
-import org.prebid.mobile.PrebidMobile
 import java.util.*
 
 class BannerAdView : LinearLayout, BannerManagerListener {
@@ -111,7 +107,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         var adRequest = request.getAdRequest() ?: return false
         fun load() {
             if (this::adView.isInitialized) {
-                checkPrebid()
                 bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
             }
         }
@@ -125,11 +120,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
         } else load()
         return true
-    }
-
-    private fun checkPrebid() {
-        Log.d(TAG, "checkPrebid: ${PrebidMobile.getPrebidServerAccountId()}")
-        Log.d(TAG, "checkPrebid: ${Gson().toJson(PrebidMobile.isSdkInitialized())}")
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
