@@ -11,6 +11,8 @@ import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import org.prebid.mobile.addendum.AdViewUtils
+import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.*
 
 class BannerAdView : LinearLayout, BannerManagerListener {
@@ -160,6 +162,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (firstLook) {
                 firstLook = false
             }
+            AdViewUtils.findPrebidCreativeSize(adView, object : AdViewUtils.PbFindSizeListener {
+                override fun success(width: Int, height: Int) {
+                    adView.setAdSizes(AdSize(width, height))
+                }
+
+                override fun failure(error: PbFindSizeError) {}
+            })
         }
 
         override fun onAdOpened() {

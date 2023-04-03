@@ -46,7 +46,8 @@ internal data class SDKConfig(
             val other: Int? = null,
             val host: String? = null,
             @SerializedName("accountid")
-            val accountId: String? = null
+            val accountId: String? = null,
+            val timeout: String? = null,
     )
 
     data class RefreshConfig(

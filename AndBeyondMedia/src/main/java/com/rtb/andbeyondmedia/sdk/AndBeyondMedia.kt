@@ -105,6 +105,7 @@ internal class PrebidWorker(private val context: Context, params: WorkerParamete
                 if (config != null && config.switch == 1) {
                     PrebidMobile.setPrebidServerHost(Host.createCustomHost(config.prebid?.host ?: ""))
                     PrebidMobile.setPrebidServerAccountId(config.prebid?.accountId ?: "")
+                    PrebidMobile.setTimeoutMillis(config.prebid?.timeout?.toIntOrNull() ?: 1000)
                     PrebidMobile.initializeSdk(context, object : SdkInitializationListener {
                         override fun onSdkInit() {
                             Log.i(TAG, "Prebid Initialized")
@@ -134,6 +135,7 @@ internal object SDKManager {
         if (config.switch != 1) return
         PrebidMobile.setPrebidServerHost(Host.createCustomHost(config.prebid?.host ?: ""))
         PrebidMobile.setPrebidServerAccountId(config.prebid?.accountId ?: "")
+        PrebidMobile.setTimeoutMillis(config.prebid?.timeout?.toIntOrNull() ?: 1000)
         PrebidMobile.initializeSdk(context, object : SdkInitializationListener {
             override fun onSdkInit() {
                 Log.i(TAG, "Prebid Initialized")
