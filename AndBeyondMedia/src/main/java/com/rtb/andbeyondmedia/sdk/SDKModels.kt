@@ -7,6 +7,8 @@ internal data class SDKConfig(
         @SerializedName("aff")
         val affiliatedId: Long? = null,
         val prebid: Prebid? = null,
+        @SerializedName("geoedge")
+        val geoEdge: GeoEdge? = null,
         @SerializedName("diff")
         val difference: Int? = null,
         @SerializedName("network")
@@ -48,6 +50,14 @@ internal data class SDKConfig(
             @SerializedName("accountid")
             val accountId: String? = null,
             val timeout: String? = null,
+    )
+
+    data class GeoEdge(
+            @SerializedName("firstlook")
+            val firstLook: Int? = null,
+            val other: Int? = null,
+            @SerializedName("api_key")
+            val apiKey: String? = null
     )
 
     data class RefreshConfig(

@@ -251,6 +251,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return null
     }
 
+    fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
+        if ((firstLook && sdkConfig?.geoEdge?.firstLook == 1) || (!firstLook && sdkConfig?.geoEdge?.other == 1)) {
+            callback()
+        }
+    }
+
     fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: () -> Unit) {
         if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
             bannerConfig.placement?.let {

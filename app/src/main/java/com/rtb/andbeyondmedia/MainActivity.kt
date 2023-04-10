@@ -26,8 +26,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadAd() {
-        val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
+
+
+        //Example of ad request with custom targeting
+        val adRequest = AdRequest().Builder().addCustomTargeting("key", "value").build()
         binding.bannerAd.loadAd(adRequest)
+
+
     }
 
 
