@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.AttributeSet
 import android.util.Log
 import android.widget.LinearLayout
-import androidx.activity.ComponentActivity
 import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
 import com.google.android.gms.ads.AdListener
@@ -18,7 +17,7 @@ import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
-import java.util.*
+import java.util.Locale
 
 class BannerAdView : LinearLayout, BannerManagerListener {
 
@@ -137,7 +136,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     private fun addGeoEdge() {
-        AppHarbr.addBannerView(AdSdk.GAM, (mContext as ComponentActivity).lifecycle, adView) { _, _, _, reasons ->
+        AppHarbr.addBannerView(AdSdk.GAM, adView) { _, _, _, reasons ->
             Log.e(TAG, "AppHarbr - On Banner Blocked $reasons")
         }
     }
