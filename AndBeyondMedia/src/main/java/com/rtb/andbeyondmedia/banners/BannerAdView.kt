@@ -13,7 +13,7 @@ import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
-import java.util.*
+import java.util.Locale
 
 class BannerAdView : LinearLayout, BannerManagerListener {
 
@@ -158,7 +158,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdLoaded() {
             super.onAdLoaded()
             bannerAdListener?.onAdLoaded()
-            bannerManager.adLoaded(firstLook)
+            bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
             }

@@ -1,12 +1,15 @@
 package com.rtb.andbeyondmedia.sdk
 
 import com.google.gson.annotations.SerializedName
+import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 
 internal data class SDKConfig(
         @SerializedName("aff")
         val affiliatedId: Long? = null,
         val prebid: Prebid? = null,
+        @SerializedName("network_block")
+        val networkBlock: String? = null,
         @SerializedName("diff")
         val difference: Int? = null,
         @SerializedName("network")
