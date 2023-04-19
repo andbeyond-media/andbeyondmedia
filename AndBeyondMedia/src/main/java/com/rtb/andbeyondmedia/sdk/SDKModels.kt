@@ -56,6 +56,7 @@ internal data class SDKConfig(
             @SerializedName("firstlook")
             val firstLook: Int? = null,
             val other: Int? = null,
+            val percentage: Int? = null,
             @SerializedName("api_key")
             val apiKey: String? = null
     )

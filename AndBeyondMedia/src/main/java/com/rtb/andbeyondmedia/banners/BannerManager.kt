@@ -12,7 +12,7 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import org.prebid.mobile.BannerAdUnit
-import java.util.*
+import java.util.Date
 import kotlin.math.ceil
 
 internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener) {
@@ -252,8 +252,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
+        val number = (0..100).random()
         if ((firstLook && sdkConfig?.geoEdge?.firstLook == 1) || (!firstLook && sdkConfig?.geoEdge?.other == 1)) {
-            callback()
+            if ((sdkConfig?.geoEdge?.percentage ?: 0) in 1..number) callback()
         }
     }
 
