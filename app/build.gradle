@@ -36,8 +36,9 @@ android {
 }
 
 dependencies {
-    implementation rootProject.ext.playServicesAds
-    implementation rootProject.ext.appcompat
+    //noinspection GradleDependency
+    implementation "androidx.appcompat:appcompat:1.5.1"
+    implementation "com.google.android.gms:play-services-ads:22.0.0"
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation project(':AndBeyondMedia')
 }

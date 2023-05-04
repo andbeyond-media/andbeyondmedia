@@ -1,10 +1,10 @@
 package com.rtb.andbeyondmedia.intersitial
 
 import android.app.Activity
-import android.util.Log
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAd
 import com.rtb.andbeyondmedia.common.AdRequest
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
+import com.rtb.andbeyondmedia.sdk.log
 
 class InterstitialAd(private val context: Activity, private val adUnit: String) {
     private var interstitialAdManager = InterstitialAdManager(context, adUnit)
@@ -21,7 +21,7 @@ class InterstitialAd(private val context: Activity, private val adUnit: String) 
         if (mAdManagerInterstitialAd != null) {
             mAdManagerInterstitialAd?.show(context)
         } else {
-            Log.e(TAG, "The interstitial ad wasn't ready yet.")
+            LogLevel.ERROR.log("The interstitial ad wasn't ready yet.")
         }
     }
 }

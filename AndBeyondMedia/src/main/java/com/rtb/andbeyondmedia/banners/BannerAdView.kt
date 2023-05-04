@@ -2,7 +2,6 @@ package com.rtb.andbeyondmedia.banners
 
 import android.content.Context
 import android.util.AttributeSet
-import android.util.Log
 import android.widget.LinearLayout
 import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
@@ -13,8 +12,9 @@ import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.Locale
@@ -140,7 +140,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     private fun addGeoEdge() {
         AppHarbr.addBannerView(AdSdk.GAM, adView) { _, _, _, reasons ->
-            Log.e(TAG, "AppHarbr - On Banner Blocked $reasons")
+            LogLevel.INFO.log("AppHarbr - On Banner Blocked $reasons")
         }
     }
 
@@ -198,17 +198,23 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     fun pauseAd() {
-        adView.pause()
-        bannerManager.adPaused()
+        if (this::adView.isInitialized) {
+            adView.pause()
+            bannerManager.adPaused()
+        }
     }
 
     fun resumeAd() {
-        adView.resume()
-        bannerManager.adResumed()
+        if (this::adView.isInitialized) {
+            adView.resume()
+            bannerManager.adResumed()
+        }
     }
 
     fun destroyAd() {
-        adView.destroy()
-        bannerManager.adDestroyed()
+        if (this::adView.isInitialized) {
+            adView.destroy()
+            bannerManager.adDestroyed()
+        }
     }
 }

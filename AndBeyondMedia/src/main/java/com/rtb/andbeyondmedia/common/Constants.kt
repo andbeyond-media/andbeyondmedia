@@ -18,3 +18,7 @@ object AdTypes {
     const val NATIVE = "NATIVE"
     const val OTHER = "OTHER"
 }
+
+enum class LogLevel {
+    DEBUG, INFO, ERROR
+}

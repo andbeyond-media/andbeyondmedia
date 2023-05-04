@@ -1,7 +1,6 @@
 package com.rtb.andbeyondmedia.rewarded
 
 import android.app.Activity
-import android.util.Log
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.LoadAdError
@@ -10,11 +9,12 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
+import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.RewardedVideoAdUnit
 
 internal class RewardedAdManager(private val context: Activity, private val adUnit: String) {
@@ -67,7 +67,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    Log.e(TAG, adError.message)
+                    LogLevel.ERROR.log(adError.message)
                     if (firstLook) {
                         firstLook = false
                         val request = createRequest().getAdRequest()
@@ -82,23 +82,28 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
         }
     }
 
+    @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
-            val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-            workerData.observeForever(object : Observer<WorkInfo> {
-                override fun onChanged(value: WorkInfo) {
-                    if (value.state != WorkInfo.State.RUNNING && value.state != WorkInfo.State.ENQUEUED) {
-                        workerData.removeObserver(this)
-                        sdkConfig = storeService.config
-                        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                        callback(shouldBeActive)
+            try {
+                val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
+                workerData?.observeForever(object : Observer<WorkInfo> {
+                    override fun onChanged(value: WorkInfo) {
+                        if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
+                            workerData.removeObserver(this)
+                            sdkConfig = storeService.config
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
+                        }
                     }
-                }
-            })
+                })
+            } catch (e: Exception) {
+                callback(false)
+            }
         }
     }
 

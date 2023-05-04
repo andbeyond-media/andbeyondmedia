@@ -52,6 +52,7 @@ internal data class SDKConfig(
             @SerializedName("accountid")
             val accountId: String? = null,
             val timeout: String? = null,
+            val debug: Int = 0
     )
 
     data class GeoEdge(

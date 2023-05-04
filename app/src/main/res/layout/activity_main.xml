@@ -14,10 +14,35 @@
         android:layout_marginTop="15dp"
         android:enabled="false"
         android:text="Show Interstitial"
+        app:layout_constraintBottom_toTopOf="@id/show_interstitial_rewarded"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
+
+    <Button
+        android:id="@+id/show_interstitial_rewarded"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="15dp"
+        android:enabled="false"
+        android:text="Show Interstitial Rewarded"
+        app:layout_constraintBottom_toTopOf="@id/show_rewarded"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/show_interstitial" />
+
+    <Button
+        android:id="@+id/show_rewarded"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="15dp"
+        android:enabled="false"
+        android:text="Show Rewarded"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/show_interstitial_rewarded" />
 
     <com.rtb.andbeyondmedia.banners.BannerAdView
         android:id="@+id/banner_ad"

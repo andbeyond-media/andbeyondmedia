@@ -7,6 +7,6 @@ class ThisApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        AndBeyondMedia.initialize(this)
+        AndBeyondMedia.initialize(this, true)
     }
 }

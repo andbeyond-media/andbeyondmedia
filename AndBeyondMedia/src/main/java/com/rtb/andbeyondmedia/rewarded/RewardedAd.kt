@@ -1,11 +1,11 @@
 package com.rtb.andbeyondmedia.rewarded
 
 import android.app.Activity
-import android.util.Log
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.common.AdRequest
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.rewardedinterstitial.Reward
+import com.rtb.andbeyondmedia.sdk.log
 
 class RewardedAd(private val context: Activity, private val adUnit: String) {
     private var rewardedAdManager = RewardedAdManager(context, adUnit)
@@ -22,7 +22,7 @@ class RewardedAd(private val context: Activity, private val adUnit: String) {
         if (mAdManagerInterstitialAd != null) {
             mAdManagerInterstitialAd?.show(context) { callBack(Reward(it.amount, it.type)) }
         } else {
-            Log.e(TAG, "The rewarded interstitial ad wasn't ready yet.")
+            LogLevel.ERROR.log("The rewarded interstitial ad wasn't ready yet.")
             callBack(null)
         }
     }

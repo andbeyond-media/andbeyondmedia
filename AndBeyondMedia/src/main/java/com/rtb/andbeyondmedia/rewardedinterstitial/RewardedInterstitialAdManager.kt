@@ -1,7 +1,6 @@
 package com.rtb.andbeyondmedia.rewardedinterstitial
 
 import android.app.Activity
-import android.util.Log
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.LoadAdError
@@ -10,12 +9,15 @@ import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
-import org.prebid.mobile.VideoInterstitialAdUnit
+import com.rtb.andbeyondmedia.sdk.log
+import org.prebid.mobile.InterstitialAdUnit
+import org.prebid.mobile.api.data.AdUnitFormat
+import java.util.EnumSet
 
 internal class RewardedInterstitialAdManager(private val context: Activity, private val adUnit: String) {
 
@@ -67,7 +69,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    Log.e(TAG, adError.message)
+                    LogLevel.ERROR.log(adError.message)
                     if (firstLook) {
                         firstLook = false
                         val request = createRequest().getAdRequest()
@@ -82,23 +84,29 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
         }
     }
 
+    @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
-            val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-            workerData.observeForever(object : Observer<WorkInfo> {
-                override fun onChanged(value: WorkInfo) {
-                    if (value.state != WorkInfo.State.RUNNING && value.state != WorkInfo.State.ENQUEUED) {
-                        workerData.removeObserver(this)
-                        sdkConfig = storeService.config
-                        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                        callback(shouldBeActive)
+            try {
+                val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
+                workerData?.observeForever(object : Observer<WorkInfo> {
+                    @Suppress("UNNECESSARY_SAFE_CALL")
+                    override fun onChanged(value: WorkInfo) {
+                        if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
+                            workerData.removeObserver(this)
+                            sdkConfig = storeService.config
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
+                        }
                     }
-                }
-            })
+                })
+            } catch (e: Exception) {
+                callback(false)
+            }
         }
     }
 
@@ -138,7 +146,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
         if (sdkConfig?.prebid?.other != 1) {
             callback()
         } else {
-            val adUnit = VideoInterstitialAdUnit((config.placement?.other ?: 0).toString())
+            val adUnit = InterstitialAdUnit((config.placement?.other ?: 0).toString(), EnumSet.of(AdUnitFormat.VIDEO))
             adUnit.fetchDemand(adRequest) { callback() }
         }
     }

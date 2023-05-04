@@ -2,8 +2,6 @@ package com.rtb.andbeyondmedia.sdk
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.util.Log
 import androidx.work.*
 import com.appharbr.sdk.configuration.AHSdkConfiguration
 import com.appharbr.sdk.engine.AppHarbr
@@ -11,14 +9,11 @@ import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
-import com.rtb.andbeyondmedia.common.TAG
+import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
-import org.prebid.mobile.api.exceptions.InitError
-import org.prebid.mobile.rendering.listeners.SdkInitializationListener
 import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -30,15 +25,19 @@ object AndBeyondMedia {
     private var storeService: StoreService? = null
     private var configService: ConfigService? = null
     private var workManager: WorkManager? = null
+    private var logEnabled = false
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context, logsEnabled: Boolean = false) {
+        this.logEnabled = logsEnabled
         fetchConfig(context)
     }
+
+    internal fun logEnabled() = logEnabled
 
     internal fun getStoreService(context: Context): StoreService {
         @Synchronized
         if (storeService == null) {
-            storeService = StoreService(context.getSharedPreferences("com.rtb.andbeyondmedia", Context.MODE_PRIVATE))
+            storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE))
         }
         return storeService as StoreService
     }
@@ -46,11 +45,10 @@ object AndBeyondMedia {
     internal fun getConfigService(): ConfigService {
         @Synchronized
         if (configService == null) {
-            val interceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
-            val client = OkHttpClient.Builder().addInterceptor(interceptor)
-                    .connectTimeout(3, TimeUnit.SECONDS)
-                    .writeTimeout(3, TimeUnit.SECONDS)
-                    .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
+            val client = OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .writeTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
             configService = Retrofit.Builder().baseUrl(BASE_URL).client(client)
                     .addConverterFactory(GsonConverterFactory.create()).build().create(ConfigService::class.java)
         }
@@ -66,29 +64,18 @@ object AndBeyondMedia {
     }
 
     private fun fetchConfig(context: Context) {
-        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-        val workerRequest = OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
-        val workManager = getWorkManager(context)
-        workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
-        workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
-            if (it?.state == WorkInfo.State.SUCCEEDED) {
-                SDKManager.initialize(context)
-            }
-        }
-    }
-
-    internal fun setAdId(context: Context) {
-        val appId = "ca-app-pub-5715345464748804~4483089114"
         try {
-            val ai = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-            val meta = ai.metaData
-            Log.d(TAG, "previous app id: ${meta.getString("com.google.android.gms.ads.APPLICATION_ID")}")
-            ai.metaData.putString("com.google.android.gms.ads.APPLICATION_ID", "" + appId)
-            Log.d(TAG, "setAdId: able to set app id : ${meta.getString("com.google.android.gms.ads.APPLICATION_ID")}")
-            MobileAds.initialize(context) {}
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            val workerRequest = OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
+            val workManager = getWorkManager(context)
+            workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
+            workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
+                if (it?.state == WorkInfo.State.SUCCEEDED) {
+                    SDKManager.initialize(context)
+                }
+            }
         } catch (e: Exception) {
-            Log.d(TAG, "setAdId: could not set app id")
-            e.printStackTrace()
+            SDKManager.initialize(context)
         }
     }
 }
@@ -108,7 +95,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
                 } ?: Result.failure()
             }
         } catch (e: Exception) {
-            Log.e(TAG, e.message ?: "")
+            LogLevel.ERROR.log(e.message ?: "")
             storeService.config?.let {
                 Result.success()
             } ?: Result.failure()
@@ -119,23 +106,20 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
 internal object SDKManager {
 
     fun initialize(context: Context) {
+        initializeGAM(context)
         val storeService = AndBeyondMedia.getStoreService(context)
         val config = storeService.config ?: return
         if (config.switch != 1) return
-        PrebidMobile.setPrebidServerHost(Host.createCustomHost(config.prebid?.host ?: ""))
-        PrebidMobile.setPrebidServerAccountId(config.prebid?.accountId ?: "")
-        PrebidMobile.setTimeoutMillis(config.prebid?.timeout?.toIntOrNull() ?: 1000)
-        PrebidMobile.initializeSdk(context, object : SdkInitializationListener {
-            override fun onSdkInit() {
-                Log.i(TAG, "Prebid Initialized")
-            }
-
-            override fun onSdkFailedToInit(error: InitError?) {
-                Log.e(TAG, error?.error ?: "")
-            }
-        })
-        initializeGAM(context)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
+        initializePrebid(context, config.prebid)
+    }
+
+    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
+        PrebidMobile.setPbsDebug(prebid?.debug == 1)
+        PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
+        PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
+        PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
+        PrebidMobile.initializeSdk(context) { LogLevel.INFO.log("Prebid Initialization Completed") }
     }
 
     private fun initializeGeoEdge(context: Context, apiKey: String?) {
@@ -143,11 +127,11 @@ internal object SDKManager {
         val configuration = AHSdkConfiguration.Builder(apiKey).build()
         AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
             override fun onSuccess() {
-                Log.i(TAG, "AppHarbr SDK Initialized Successfully")
+                LogLevel.INFO.log("AppHarbr SDK Initialized Successfully")
             }
 
             override fun onFailure(reason: InitializationFailureReason) {
-                Log.e(TAG, "AppHarbr SDK Initialization Failed: " + reason.readableHumanReason)
+                LogLevel.ERROR.log("AppHarbr SDK Initialization Failed: ${reason.readableHumanReason}")
             }
 
         })
@@ -155,7 +139,7 @@ internal object SDKManager {
 
     private fun initializeGAM(context: Context) {
         MobileAds.initialize(context) {
-            Log.i(TAG, "GAM Initialization complete.")
+            LogLevel.INFO.log("GAM Initialization complete.")
         }
     }
 }

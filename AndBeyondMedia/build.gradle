@@ -41,8 +41,9 @@ ext {
 
 dependencies {
 
-    implementation rootProject.ext.playServicesAds
-    implementation rootProject.ext.appcompat
+    //noinspection GradleDependency
+    implementation "androidx.appcompat:appcompat:1.5.1"
+    implementation "com.google.android.gms:play-services-ads:22.0.0"
     implementation "com.squareup.okhttp3:okhttp:$okhttp"
     implementation "com.squareup.okhttp3:logging-interceptor:$okhttp"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit"
@@ -59,7 +60,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.andbeyond-media'
             artifactId = 'andbeyondmedia'
-            version = '1.0.5'
+            version = '1.0.6'
 
             afterEvaluate {
                 from components.release

@@ -66,23 +66,28 @@ internal class BannerManager(private val context: Context, private val bannerLis
         storeService.config = null
     }
 
+    @Suppress("UNNECESSARY_SAFE_CALL")
     fun shouldSetConfig(callback: (Boolean) -> Unit) {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
-            val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-            workerData.observeForever(object : Observer<WorkInfo> {
-                override fun onChanged(value: WorkInfo) {
-                    if (value.state != WorkInfo.State.RUNNING && value.state != WorkInfo.State.ENQUEUED) {
-                        workerData.removeObserver(this)
-                        sdkConfig = storeService.config
-                        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                        callback(shouldBeActive)
+            try {
+                val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
+                workerData?.observeForever(object : Observer<WorkInfo> {
+                    override fun onChanged(value: WorkInfo) {
+                        if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
+                            workerData.removeObserver(this)
+                            sdkConfig = storeService.config
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
+                        }
                     }
-                }
-            })
+                })
+            } catch (e: Exception) {
+                callback(false)
+            }
         }
     }
 
