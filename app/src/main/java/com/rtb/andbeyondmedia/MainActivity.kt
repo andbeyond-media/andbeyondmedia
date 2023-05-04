@@ -2,7 +2,9 @@ package com.rtb.andbeyondmedia
 
 import android.os.Bundle
 import android.util.DisplayMetrics
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.rtb.andbeyondmedia.banners.BannerAdListener
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
@@ -28,6 +30,28 @@ class MainActivity : AppCompatActivity() {
     private fun loadAd() {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
+        binding.bannerAd.setAdListener(object : BannerAdListener {
+            override fun onAdClicked() {
+
+            }
+
+            override fun onAdClosed() {
+            }
+
+            override fun onAdFailedToLoad(error: String) {
+            }
+
+            override fun onAdImpression() {
+            }
+
+            override fun onAdLoaded() {
+                Log.d("Sonu", "onAdLoaded: ")
+            }
+
+            override fun onAdOpened() {
+            }
+
+        })
     }
 
 

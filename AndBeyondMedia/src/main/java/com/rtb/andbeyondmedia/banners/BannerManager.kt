@@ -165,18 +165,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
         if (sdkConfig?.switch == 1) {
-            val blockers = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
+            val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
             var isNetworkBlocked = false
-            blockers.forEach {
-                if (loadedAdapter?.adapterClassName?.contains(it, true) == true) {
+            blockedTerms.forEach {
+                if (it.isNotEmpty() && loadedAdapter?.adapterClassName?.contains(it, true) == true) {
                     isNetworkBlocked = true
                 }
             }
             if (!isNetworkBlocked
-                    && !blockers.contains(loadedAdapter?.adSourceId)
-                    && !blockers.contains(loadedAdapter?.adSourceName)
-                    && !blockers.contains(loadedAdapter?.adSourceInstanceId)
-                    && !blockers.contains(loadedAdapter?.adSourceInstanceName)) {
+                    && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
+                    && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
+                    && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
+                    && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))) {
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
             }
         }

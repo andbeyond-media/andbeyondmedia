@@ -2,6 +2,7 @@ package com.rtb.andbeyondmedia.sdk
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.*
 import com.google.android.gms.ads.MobileAds
@@ -67,6 +68,21 @@ object AndBeyondMedia {
             if (it?.state == WorkInfo.State.SUCCEEDED) {
                 SDKManager.initialize(context)
             }
+        }
+    }
+
+    internal fun setAdId(context: Context) {
+        val appId = "ca-app-pub-5715345464748804~4483089114"
+        try {
+            val ai = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+            val meta = ai.metaData
+            Log.d(TAG, "previous app id: ${meta.getString("com.google.android.gms.ads.APPLICATION_ID")}")
+            ai.metaData.putString("com.google.android.gms.ads.APPLICATION_ID", "" + appId)
+            Log.d(TAG, "setAdId: able to set app id : ${meta.getString("com.google.android.gms.ads.APPLICATION_ID")}")
+            MobileAds.initialize(context) {}
+        } catch (e: Exception) {
+            Log.d(TAG, "setAdId: could not set app id")
+            e.printStackTrace()
         }
     }
 }
