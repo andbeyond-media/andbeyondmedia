@@ -127,11 +127,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (it) {
                     bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
                     adRequest = bannerManager.checkOverride() ?: adRequest
-                    bannerManager.checkGeoEdge(firstLook) { addGeoEdge() }
+                    bannerManager.checkGeoEdge(true) { addGeoEdge() }
                 }
                 load()
             }
-        } else load()
+        } else {
+            bannerManager.checkGeoEdge(false) { addGeoEdge() }
+            load()
+        }
         return true
     }
 
