@@ -1,13 +1,14 @@
 package com.rtb.andbeyondmedia.sdk
 
 import com.google.gson.annotations.SerializedName
-import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 
 internal data class SDKConfig(
         @SerializedName("aff")
         val affiliatedId: Long? = null,
         val prebid: Prebid? = null,
+        @SerializedName("geoedge")
+        val geoEdge: GeoEdge? = null,
         @SerializedName("network_block")
         val networkBlock: String? = null,
         @SerializedName("diff")
@@ -51,6 +52,15 @@ internal data class SDKConfig(
             @SerializedName("accountid")
             val accountId: String? = null,
             val timeout: String? = null,
+    )
+
+    data class GeoEdge(
+            @SerializedName("firstlook")
+            val firstLook: Int? = null,
+            val other: Int? = null,
+            val percentage: Int? = null,
+            @SerializedName("api_key")
+            val apiKey: String? = null
     )
 
     data class RefreshConfig(

@@ -5,11 +5,16 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.*
+import com.appharbr.sdk.configuration.AHSdkConfiguration
+import com.appharbr.sdk.engine.AppHarbr
+import com.appharbr.sdk.engine.InitializationFailureReason
+import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
 import org.prebid.mobile.api.exceptions.InitError
@@ -41,7 +46,8 @@ object AndBeyondMedia {
     internal fun getConfigService(): ConfigService {
         @Synchronized
         if (configService == null) {
-            val client = OkHttpClient.Builder()
+            val interceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+            val client = OkHttpClient.Builder().addInterceptor(interceptor)
                     .connectTimeout(3, TimeUnit.SECONDS)
                     .writeTimeout(3, TimeUnit.SECONDS)
                     .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
@@ -129,6 +135,22 @@ internal object SDKManager {
             }
         })
         initializeGAM(context)
+        initializeGeoEdge(context, config.geoEdge?.apiKey)
+    }
+
+    private fun initializeGeoEdge(context: Context, apiKey: String?) {
+        if (apiKey.isNullOrEmpty()) return
+        val configuration = AHSdkConfiguration.Builder(apiKey).build()
+        AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
+            override fun onSuccess() {
+                Log.i(TAG, "AppHarbr SDK Initialized Successfully")
+            }
+
+            override fun onFailure(reason: InitializationFailureReason) {
+                Log.e(TAG, "AppHarbr SDK Initialization Failed: " + reason.readableHumanReason)
+            }
+
+        })
     }
 
     private fun initializeGAM(context: Context) {

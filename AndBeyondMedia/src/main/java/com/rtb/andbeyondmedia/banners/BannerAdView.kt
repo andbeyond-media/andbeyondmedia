@@ -2,7 +2,10 @@ package com.rtb.andbeyondmedia.banners
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.widget.LinearLayout
+import com.appharbr.sdk.engine.AdSdk
+import com.appharbr.sdk.engine.AppHarbr
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
@@ -10,6 +13,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.common.TAG
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
@@ -105,6 +109,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         this.bannerAdListener = listener
     }
 
+    fun removeBannerView(bannerAdView: BannerAdView) {
+        if (bannerAdView::adView.isInitialized) {
+            AppHarbr.removeBannerView(bannerAdView.adView)
+        }
+    }
+
     override fun loadAd(request: AdRequest): Boolean {
         var adRequest = request.getAdRequest() ?: return false
         fun load() {
@@ -117,11 +127,21 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (it) {
                     bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
                     adRequest = bannerManager.checkOverride() ?: adRequest
+                    bannerManager.checkGeoEdge(true) { addGeoEdge() }
                 }
                 load()
             }
-        } else load()
+        } else {
+            bannerManager.checkGeoEdge(false) { addGeoEdge() }
+            load()
+        }
         return true
+    }
+
+    private fun addGeoEdge() {
+        AppHarbr.addBannerView(AdSdk.GAM, adView) { _, _, _, reasons ->
+            Log.e(TAG, "AppHarbr - On Banner Blocked $reasons")
+        }
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
