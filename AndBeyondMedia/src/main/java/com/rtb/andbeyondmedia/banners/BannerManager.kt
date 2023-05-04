@@ -5,6 +5,7 @@ import android.os.CountDownTimer
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdapterResponseInfo
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -162,9 +163,22 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    fun adLoaded(firstLook: Boolean) {
+    fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
         if (sdkConfig?.switch == 1) {
-            startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
+            val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
+            var isNetworkBlocked = false
+            blockedTerms.forEach {
+                if (it.isNotEmpty() && loadedAdapter?.adapterClassName?.contains(it, true) == true) {
+                    isNetworkBlocked = true
+                }
+            }
+            if (!isNetworkBlocked
+                    && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
+                    && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
+                    && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
+                    && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))) {
+                startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
+            }
         }
     }
 

@@ -178,7 +178,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdLoaded() {
             super.onAdLoaded()
             bannerAdListener?.onAdLoaded()
-            bannerManager.adLoaded(firstLook)
+            bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
             }

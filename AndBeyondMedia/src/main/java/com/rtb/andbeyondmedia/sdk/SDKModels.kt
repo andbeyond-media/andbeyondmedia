@@ -9,6 +9,8 @@ internal data class SDKConfig(
         val prebid: Prebid? = null,
         @SerializedName("geoedge")
         val geoEdge: GeoEdge? = null,
+        @SerializedName("network_block")
+        val networkBlock: String? = null,
         @SerializedName("diff")
         val difference: Int? = null,
         @SerializedName("network")
