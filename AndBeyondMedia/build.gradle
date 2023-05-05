@@ -51,7 +51,7 @@ dependencies {
     implementation 'org.prebid:prebid-mobile-sdk:2.1.0'
     //noinspection GradleDependency
     implementation 'androidx.work:work-runtime-ktx:2.7.1'
-    api project(':GeoEdge')
+    implementation project(':GeoEdge')
 
 }
 
