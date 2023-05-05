@@ -15,4 +15,3 @@ dependencyResolutionManagement {
 rootProject.name = "AndBeyondMedia"
 include ':app'
 include ':AndBeyondMedia'
-include ':GeoEdge'

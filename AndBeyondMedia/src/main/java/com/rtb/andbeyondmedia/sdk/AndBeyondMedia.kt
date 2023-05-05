@@ -3,10 +3,6 @@ package com.rtb.andbeyondmedia.sdk
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.work.*
-import com.appharbr.sdk.configuration.AHSdkConfiguration
-import com.appharbr.sdk.engine.AppHarbr
-import com.appharbr.sdk.engine.InitializationFailureReason
-import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.LogLevel
@@ -110,7 +106,6 @@ internal object SDKManager {
         val storeService = AndBeyondMedia.getStoreService(context)
         val config = storeService.config ?: return
         if (config.switch != 1) return
-        initializeGeoEdge(context, config.geoEdge?.apiKey)
         initializePrebid(context, config.prebid)
     }
 
@@ -120,21 +115,6 @@ internal object SDKManager {
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
         PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
         PrebidMobile.initializeSdk(context) { LogLevel.INFO.log("Prebid Initialization Completed") }
-    }
-
-    private fun initializeGeoEdge(context: Context, apiKey: String?) {
-        if (apiKey.isNullOrEmpty()) return
-        val configuration = AHSdkConfiguration.Builder(apiKey).build()
-        AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
-            override fun onSuccess() {
-                LogLevel.INFO.log("AppHarbr SDK Initialized Successfully")
-            }
-
-            override fun onFailure(reason: InitializationFailureReason) {
-                LogLevel.ERROR.log("AppHarbr SDK Initialization Failed: ${reason.readableHumanReason}")
-            }
-
-        })
     }
 
     private fun initializeGAM(context: Context) {

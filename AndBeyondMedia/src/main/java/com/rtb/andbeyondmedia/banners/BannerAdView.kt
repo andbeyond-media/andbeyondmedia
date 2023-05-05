@@ -3,8 +3,6 @@ package com.rtb.andbeyondmedia.banners
 import android.content.Context
 import android.util.AttributeSet
 import android.widget.LinearLayout
-import com.appharbr.sdk.engine.AdSdk
-import com.appharbr.sdk.engine.AppHarbr
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
@@ -12,9 +10,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
-import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.Locale
@@ -109,12 +105,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         this.bannerAdListener = listener
     }
 
-    fun removeBannerView(bannerAdView: BannerAdView) {
-        if (bannerAdView::adView.isInitialized) {
-            AppHarbr.removeBannerView(bannerAdView.adView)
-        }
-    }
-
     override fun loadAd(request: AdRequest): Boolean {
         var adRequest = request.getAdRequest() ?: return false
         fun load() {
@@ -127,21 +117,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (it) {
                     bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
                     adRequest = bannerManager.checkOverride() ?: adRequest
-                    bannerManager.checkGeoEdge(true) { addGeoEdge() }
                 }
                 load()
             }
         } else {
-            bannerManager.checkGeoEdge(false) { addGeoEdge() }
             load()
         }
         return true
-    }
-
-    private fun addGeoEdge() {
-        AppHarbr.addBannerView(AdSdk.GAM, adView) { _, _, _, reasons ->
-            LogLevel.INFO.log("AppHarbr - On Banner Blocked $reasons")
-        }
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
