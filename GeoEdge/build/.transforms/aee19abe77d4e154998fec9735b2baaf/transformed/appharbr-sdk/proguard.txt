@@ -1,0 +1,3 @@
+-keep class com.appharbr.** {*;}
+-keep interface com.appharbr.** {*;}
+-keepclassmembers class com.appharbr.** { public *; }
