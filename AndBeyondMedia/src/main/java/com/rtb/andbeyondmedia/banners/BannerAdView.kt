@@ -146,9 +146,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
             bannerAdListener?.onAdFailedToLoad(p0.toString())
+            bannerManager.adFailedToLoad(firstLook)
             if (firstLook) {
                 firstLook = false
-                bannerManager.adFailedToLoad()
             }
         }
 

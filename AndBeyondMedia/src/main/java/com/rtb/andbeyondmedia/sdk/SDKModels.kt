@@ -6,6 +6,9 @@ import com.google.gson.annotations.SerializedName
 internal data class SDKConfig(
         @SerializedName("aff")
         val affiliatedId: Long? = null,
+        val refetch: Long? = null,
+        @SerializedName("retry_config")
+        val retryConfig: RetryConfig? = null,
         val prebid: Prebid? = null,
         @SerializedName("geoedge")
         val geoEdge: GeoEdge? = null,
@@ -43,6 +46,13 @@ internal data class SDKConfig(
             it?.forEach { unit -> add(unit) }
         }
     }
+
+    data class RetryConfig(
+            val networks: String? = null,
+            var retries: Int? = null,
+            @SerializedName("retry_interval")
+            val retryInterval: Int? = null
+    )
 
     data class Prebid(
             @SerializedName("firstlook")

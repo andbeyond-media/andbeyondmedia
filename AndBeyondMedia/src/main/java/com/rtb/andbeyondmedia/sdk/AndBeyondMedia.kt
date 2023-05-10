@@ -59,15 +59,24 @@ object AndBeyondMedia {
         return workManager as WorkManager
     }
 
-    private fun fetchConfig(context: Context) {
+    private fun fetchConfig(context: Context, delay: Long? = null) {
+        if (delay != null && delay < 900) return
         try {
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            val workerRequest = OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
+            val workerRequest: OneTimeWorkRequest = delay?.let {
+                OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).setInitialDelay(it, TimeUnit.SECONDS).build()
+            } ?: kotlin.run {
+                OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
+            }
             val workManager = getWorkManager(context)
+            val storeService = getStoreService(context)
             workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
                     SDKManager.initialize(context)
+                    if (storeService.config != null && storeService.config?.refetch != null) {
+                        fetchConfig(context, storeService.config?.refetch)
+                    }
                 }
             }
         } catch (e: Exception) {
