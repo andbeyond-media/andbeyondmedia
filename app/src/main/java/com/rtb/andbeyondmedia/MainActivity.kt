@@ -151,7 +151,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     }
 
     override fun onAdImpression() {
-
+        Log.d("Ads", "onAdImpression: ")
     }
 
     override fun onAdLoaded() {

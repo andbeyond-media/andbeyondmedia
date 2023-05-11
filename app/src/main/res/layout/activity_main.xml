@@ -48,7 +48,7 @@
         android:id="@+id/banner_ad"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:adSizes="BANNER, LARGE_BANNER"
+        app:adSizes="BANNER"
         app:adType="BANNER"
         app:adUnitId="/6499/example/banner"
         app:layout_constraintBottom_toBottomOf="parent"

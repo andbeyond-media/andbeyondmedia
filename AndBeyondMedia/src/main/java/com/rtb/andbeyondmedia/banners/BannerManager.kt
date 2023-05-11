@@ -185,6 +185,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
         if (sdkConfig?.switch == 1) {
             bannerConfig.retryConfig = sdkConfig?.retryConfig
+            unfilledRefreshCounter?.cancel()
             val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
             var isNetworkBlocked = false
             blockedTerms.forEach {
@@ -264,12 +265,16 @@ internal class BannerManager(private val context: Context, private val bannerLis
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
             loadAd(active)
         }
-        if (unfilled || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))
-                        && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb)))
-        ) {
-            refreshAd()
-        } else {
+        if (isForegroundRefresh == 0 && bannerConfig.factor < 0) {
             startRefreshing()
+        } else {
+            if (unfilled || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))
+                            && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb)))
+            ) {
+                refreshAd()
+            } else {
+                startRefreshing()
+            }
         }
     }
 
