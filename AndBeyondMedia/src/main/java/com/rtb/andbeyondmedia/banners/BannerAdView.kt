@@ -86,7 +86,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
-
     fun setAdUnitID(adUnitId: String) {
         this.currentAdUnit = adUnitId
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {

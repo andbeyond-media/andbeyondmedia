@@ -97,7 +97,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String) {
         if (!shouldBeActive()) return
-        if (sdkConfig?.getBlockList()?.contains(pubAdUnit) == true) {
+        if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it) } == true) {
             shouldBeActive = false
             return
         }
@@ -173,11 +173,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adFailedToLoad(isPublisherLoad: Boolean) {
         if (bannerConfig.unFilled?.status == 1) {
             startUnfilledRefreshCounter(sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L)
-            if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
-                bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
+            if (isPublisherLoad) {
                 Handler(Looper.getMainLooper()).postDelayed({
                     refresh(unfilled = true)
                 }, (bannerConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+            } else {
+                if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
+                    bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        refresh(unfilled = true)
+                    }, (bannerConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                }
             }
         }
     }
@@ -203,21 +209,30 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false) {
+    private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false, timers: Int? = null) {
         if (resetVisibleTime) {
             bannerConfig.isVisibleFor = 0
         }
         this.wasFirstLook = isPublisherLoad
         bannerConfig.let {
-            startPassiveCounter(it.passiveRefreshInterval.toLong())
-            startActiveCounter(it.activeRefreshInterval.toLong())
+            timers?.let { active ->
+                if (active == 1) startActiveCounter(it.activeRefreshInterval.toLong())
+                else startPassiveCounter(it.passiveRefreshInterval.toLong())
+            } ?: kotlin.run {
+                startPassiveCounter(it.passiveRefreshInterval.toLong())
+                startActiveCounter(it.activeRefreshInterval.toLong())
+            }
         }
     }
 
     private fun startActiveCounter(seconds: Long) {
         activeTimeCounter?.cancel()
+        if (seconds <= 0) return
         activeTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
+                if (bannerConfig.isVisible) {
+                    bannerConfig.isVisibleFor++
+                }
                 bannerConfig.activeRefreshInterval--
             }
 
@@ -231,9 +246,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun startPassiveCounter(seconds: Long) {
         passiveTimeCounter?.cancel()
+        if (seconds <= 0) return
         passiveTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                bannerConfig.isVisibleFor++
                 bannerConfig.passiveRefreshInterval--
             }
 
@@ -247,11 +262,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun startUnfilledRefreshCounter(seconds: Long) {
         unfilledRefreshCounter?.cancel()
+        if (seconds <= 0) return
         unfilledRefreshCounter = object : CountDownTimer(seconds * 1000, 1000) {
-            override fun onTick(millisUntilFinished: Long) {}
+            override fun onTick(millisUntilFinished: Long) {
+
+            }
 
             override fun onFinish() {
-                refresh(1)
+                refresh(0, true)
             }
         }
         unfilledRefreshCounter?.start()
@@ -260,39 +278,47 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun refresh(active: Int = 1, unfilled: Boolean = false) {
         val currentTimeStamp = Date().time
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
+        var timers = if (active == 0 && unfilled) {
+            null
+        } else {
+            active
+        }
+
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
-            loadAd(active)
+            loadAd(active, unfilled)
         }
         if (isForegroundRefresh == 0 && bannerConfig.factor < 0) {
-            startRefreshing()
+            startRefreshing(timers = timers)
         } else {
             if (unfilled || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))
                             && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb)))
             ) {
                 refreshAd()
             } else {
-                startRefreshing()
+                startRefreshing(timers = timers)
             }
         }
     }
 
-    private fun createRequest(active: Int) = AdRequest().Builder().apply {
+    private fun createRequest(active: Int, unfilled: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
         addCustomTargeting("hb_format", "amp")
         addCustomTargeting("visible", isForegroundRefresh.toString())
+        addCustomTargeting("min_view", (if (bannerConfig.isVisibleFor > 10) 10 else bannerConfig.isVisibleFor).toString())
+        addCustomTargeting("retry", (if (unfilled) 1 else 0).toString())
     }.build()
 
-    private fun loadAd(active: Int) {
+    private fun loadAd(active: Int, unfilled: Boolean) {
         if (bannerConfig.refreshCount < 10) {
             bannerConfig.refreshCount++
         } else {
             bannerConfig.refreshCount = 10
         }
-        bannerListener.loadAd(createRequest(active))
+        bannerListener.loadAd(createRequest(active, unfilled))
     }
 
     fun checkOverride(): AdManagerAdRequest? {
