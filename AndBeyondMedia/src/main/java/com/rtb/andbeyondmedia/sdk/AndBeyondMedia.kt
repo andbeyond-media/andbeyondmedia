@@ -3,6 +3,10 @@ package com.rtb.andbeyondmedia.sdk
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.work.*
+import com.appharbr.sdk.configuration.AHSdkConfiguration
+import com.appharbr.sdk.engine.AppHarbr
+import com.appharbr.sdk.engine.InitializationFailureReason
+import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.LogLevel
@@ -116,6 +120,7 @@ internal object SDKManager {
         val config = storeService.config ?: return
         if (config.switch != 1) return
         initializePrebid(context, config.prebid)
+        initializeGeoEdge(context, config.geoEdge?.apiKey)
     }
 
     private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
@@ -130,6 +135,21 @@ internal object SDKManager {
         MobileAds.initialize(context) {
             LogLevel.INFO.log("GAM Initialization complete.")
         }
+    }
+
+    private fun initializeGeoEdge(context: Context, apiKey: String?) {
+        if (apiKey.isNullOrEmpty()) return
+        val configuration = AHSdkConfiguration.Builder(apiKey).build()
+        AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
+            override fun onSuccess() {
+                LogLevel.INFO.log("AppHarbr SDK Initialized Successfully")
+            }
+
+            override fun onFailure(reason: InitializationFailureReason) {
+                LogLevel.ERROR.log("AppHarbr SDK Initialization Failed: ${reason.readableHumanReason}")
+            }
+
+        })
     }
 }
 

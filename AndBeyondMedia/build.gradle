@@ -50,6 +50,7 @@ dependencies {
     implementation "com.squareup.retrofit2:retrofit:$retrofit"
     implementation 'org.prebid:prebid-mobile-sdk:2.1.0'
     implementation 'com.google.ads.mediation:inmobi:10.5.4.1'
+    implementation 'com.github.appharbr:appharbr-android-sdk:2.10.3'
     //noinspection GradleDependency
     implementation 'androidx.work:work-runtime-ktx:2.7.1'
 
