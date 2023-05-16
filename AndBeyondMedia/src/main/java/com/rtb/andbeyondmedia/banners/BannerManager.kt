@@ -12,6 +12,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
+import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import org.prebid.mobile.BannerAdUnit
@@ -341,9 +342,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
-        val number = (0..100).random()
-        if ((firstLook && sdkConfig?.geoEdge?.firstLook == 1) || (!firstLook && sdkConfig?.geoEdge?.other == 1)) {
-            if ((sdkConfig?.geoEdge?.percentage ?: 0) in 1..number) callback()
+        val number = (1..100).random()
+        if ((firstLook && ((sdkConfig?.geoEdge?.firstLook ?: 0) in 1..number)) ||
+                (!firstLook && ((sdkConfig?.geoEdge?.other ?: 0) in 1..number))) {
+            callback()
         }
     }
 

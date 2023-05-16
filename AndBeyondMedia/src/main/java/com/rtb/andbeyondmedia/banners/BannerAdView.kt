@@ -14,6 +14,7 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.addendum.AdViewUtils
