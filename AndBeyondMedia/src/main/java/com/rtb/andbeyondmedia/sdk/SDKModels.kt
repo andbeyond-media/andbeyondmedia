@@ -90,7 +90,8 @@ internal data class SDKConfig(
             @SerializedName("pos")
             val position: Int? = null,
             val placement: Placement? = null,
-            val specific: String? = null
+            val specific: String? = null,
+            val expiry: Int? = null
     )
 
     data class Size(
@@ -134,6 +135,8 @@ internal data class SDKConfig(
             val inread: LoadConfig? = null,
             @SerializedName("STICKY")
             val sticky: LoadConfig? = null,
+            @SerializedName("APPOPEN")
+            val appOpen: LoadConfig? = null,
             @SerializedName("ALL")
             val other: LoadConfig? = null
     )

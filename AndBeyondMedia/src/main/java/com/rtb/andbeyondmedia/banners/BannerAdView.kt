@@ -163,7 +163,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (firstLook) {
                 firstLook = false
             }
-            bannerManager.adFailedToLoad(tempStatus)
+            try {
+                bannerManager.adFailedToLoad(tempStatus)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         override fun onAdImpression() {
