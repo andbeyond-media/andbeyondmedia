@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.util.DisplayMetrics
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
-import com.rtb.andbeyondmedia.banners.BannerAdListener
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
@@ -13,6 +12,7 @@ import com.rtb.andbeyondmedia.databinding.ActivityMainBinding
 import com.rtb.andbeyondmedia.intersitial.InterstitialAd
 import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
+import com.rtb.andbeyondmedia.sdk.BannerAdListener
 
 class MainActivity : AppCompatActivity(), BannerAdListener {
     private lateinit var binding: ActivityMainBinding
@@ -63,14 +63,14 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
 
     private fun loadInterstitialRewarded() {
         rewardedInterstitialAd = RewardedInterstitialAd(this, "/21775744923/example/rewarded_interstitial")
-        rewardedInterstitialAd?.load(AdRequest().Builder().build()) {
+        rewardedInterstitialAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
             binding.showInterstitialRewarded.isEnabled = it
         }
     }
 
     private fun loadRewarded() {
         rewardedAd = RewardedAd(this, "/6499/example/rewarded")
-        rewardedAd?.load(AdRequest().Builder().build()) {
+        rewardedAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
             binding.showRewarded.isEnabled = it
         }
     }

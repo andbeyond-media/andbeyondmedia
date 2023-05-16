@@ -51,8 +51,15 @@ internal data class SDKConfig(
             val networks: String? = null,
             var retries: Int? = null,
             @SerializedName("retry_interval")
-            val retryInterval: Int? = null
-    )
+            val retryInterval: Int? = null,
+            var adUnits: ArrayList<String> = arrayListOf()
+    ) {
+        fun fillAdUnits() {
+            adUnits = arrayListOf<String>().apply {
+                addAll(networks?.replace(" ", "")?.split(",") ?: arrayListOf())
+            }
+        }
+    }
 
     data class Prebid(
             @SerializedName("firstlook")
@@ -62,7 +69,8 @@ internal data class SDKConfig(
             @SerializedName("accountid")
             val accountId: String? = null,
             val timeout: String? = null,
-            val debug: Int = 0
+            val debug: Int = 0,
+            val schain: String? = "{ \"ver\":\"1.0\", \"complete\": 1, \"nodes\": [ { \"asi\":\"directseller.com\", \"sid\":\"00001\", \"rid\":\"BidRequest1\", \"hp\":1 } ] }"
     )
 
     data class GeoEdge(

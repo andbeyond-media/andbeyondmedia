@@ -14,6 +14,7 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
@@ -157,10 +158,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
             bannerAdListener?.onAdFailedToLoad(p0.toString())
-            bannerManager.adFailedToLoad(firstLook)
+            val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
             }
+            bannerManager.adFailedToLoad(tempStatus)
         }
 
         override fun onAdImpression() {

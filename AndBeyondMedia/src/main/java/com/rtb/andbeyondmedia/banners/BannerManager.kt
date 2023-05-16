@@ -29,6 +29,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var wasFirstLook = true
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var isForegroundRefresh = 1
+    private var overridingUnit: String? = null
 
     init {
         sdkConfig = storeService.config
@@ -113,7 +114,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             position = validConfig.position ?: 0
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
-            retryConfig = sdkConfig?.retryConfig
+            retryConfig = sdkConfig?.retryConfig?.also { it.fillAdUnits() }
             hijack = getValidLoadConfig(adType, true)
             unFilled = getValidLoadConfig(adType, false)
             difference = sdkConfig?.difference ?: 0
@@ -174,15 +175,21 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (bannerConfig.unFilled?.status == 1) {
             startUnfilledRefreshCounter(sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L)
             if (isPublisherLoad) {
-                Handler(Looper.getMainLooper()).postDelayed({
-                    refresh(unfilled = true)
-                }, (bannerConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                refresh(unfilled = true)
             } else {
                 if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
                     bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
                     Handler(Looper.getMainLooper()).postDelayed({
-                        refresh(unfilled = true)
+                        bannerConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                            bannerConfig.retryConfig?.adUnits?.removeAt(0)
+                            overridingUnit = it
+                            refresh(unfilled = true)
+                        } ?: kotlin.run {
+                            overridingUnit = null
+                        }
                     }, (bannerConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                } else {
+                    overridingUnit = null
                 }
             }
         }
@@ -190,6 +197,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
         if (sdkConfig?.switch == 1) {
+            overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig
             unfilledRefreshCounter?.cancel()
             val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
@@ -278,7 +286,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun refresh(active: Int = 1, unfilled: Boolean = false) {
         val currentTimeStamp = Date().time
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
-        var timers = if (active == 0 && unfilled) {
+        val timers = if (active == 0 && unfilled) {
             null
         } else {
             active
@@ -356,7 +364,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
-        return String.format("%s-%d", bannerConfig.customUnitName, if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
+        return overridingUnit ?: String.format("%s-%d", bannerConfig.customUnitName,
+                if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
     }
 
     fun adPaused() {

@@ -14,6 +14,8 @@ import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
+import org.prebid.mobile.TargetingParams
+import org.prebid.mobile.rendering.models.openrtb.bidRequests.Ext
 import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -129,6 +131,11 @@ internal object SDKManager {
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
         PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
         PrebidMobile.initializeSdk(context) { LogLevel.INFO.log("Prebid Initialization Completed") }
+        prebid?.schain?.let {
+            TargetingParams.setUserExt(Ext().apply {
+                put("schain", it)
+            })
+        }
     }
 
     private fun initializeGAM(context: Context) {
