@@ -172,7 +172,11 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
     }
 
     private fun isAdAvailable(): Boolean {
-        return appOpenAd != null && wasLoadTimeLessThanNHoursAgo(4)
+        return if (appOpenCofig.expriry != 0) {
+            appOpenAd != null && wasLoadTimeLessThanNHoursAgo(appOpenCofig.expriry.toLong())
+        } else {
+            appOpenAd != null
+        }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
