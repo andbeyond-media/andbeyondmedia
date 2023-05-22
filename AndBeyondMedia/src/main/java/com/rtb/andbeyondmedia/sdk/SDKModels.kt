@@ -70,7 +70,7 @@ internal data class SDKConfig(
             val accountId: String? = null,
             val timeout: String? = null,
             val debug: Int = 0,
-            val schain: String? = "{ \"ver\":\"1.0\", \"complete\": 1, \"nodes\": [ { \"asi\":\"directseller.com\", \"sid\":\"00001\", \"rid\":\"BidRequest1\", \"hp\":1 } ] }"
+            val schain: String? = null
     )
 
     data class GeoEdge(

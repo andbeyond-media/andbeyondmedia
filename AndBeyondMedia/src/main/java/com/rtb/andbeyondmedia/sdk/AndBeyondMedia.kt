@@ -76,7 +76,7 @@ object AndBeyondMedia {
             }
             val workManager = getWorkManager(context)
             val storeService = getStoreService(context)
-            workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
+            workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName + this.javaClass.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
                     SDKManager.initialize(context)

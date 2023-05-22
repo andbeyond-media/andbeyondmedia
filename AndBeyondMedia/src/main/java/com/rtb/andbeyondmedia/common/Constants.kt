@@ -20,6 +20,6 @@ object AdTypes {
     const val OTHER = "OTHER"
 }
 
-enum class LogLevel {
+internal enum class LogLevel {
     DEBUG, INFO, ERROR
 }
