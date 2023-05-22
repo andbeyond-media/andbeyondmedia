@@ -25,3 +25,7 @@ interface BannerAdListener {
     fun onAdLoaded()
     fun onAdOpened()
 }
+
+fun interface OnShowAdCompleteListener {
+    fun onShowAdComplete()
+}

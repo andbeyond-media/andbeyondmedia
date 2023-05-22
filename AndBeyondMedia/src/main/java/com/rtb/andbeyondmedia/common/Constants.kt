@@ -15,6 +15,7 @@ object AdTypes {
     const val INTERSTITIAL = "INTERSTITIAL"
     const val REWARDEDINTERSTITIAL = "REWARDEDINTERSTITIAL"
     const val REWARDED = "REWARDED"
+    const val APPOPEN = "APPOPEN"
     const val NATIVE = "NATIVE"
     const val OTHER = "OTHER"
 }
