@@ -343,8 +343,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
         val number = (1..100).random()
-        if ((firstLook && ((sdkConfig?.geoEdge?.firstLook ?: 0) in 1..number)) ||
-                (!firstLook && ((sdkConfig?.geoEdge?.other ?: 0) in 1..number))) {
+        if ((firstLook && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
+                (!firstLook && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
             callback()
         }
     }
