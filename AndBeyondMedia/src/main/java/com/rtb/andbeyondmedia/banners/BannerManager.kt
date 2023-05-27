@@ -11,6 +11,7 @@ import com.google.android.gms.ads.AdapterResponseInfo
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.common.connectionAvailable
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
@@ -298,7 +299,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
             loadAd(active, unfilled)
         }
-        if (isForegroundRefresh == 0 && bannerConfig.factor < 0) {
+        if (context.connectionAvailable() == false || (isForegroundRefresh == 0 && bannerConfig.factor < 0)) {
             startRefreshing(timers = timers)
         } else {
             if (unfilled || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))

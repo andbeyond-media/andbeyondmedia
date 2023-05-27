@@ -10,9 +10,9 @@ android {
     defaultConfig {
         minSdk 21
         targetSdk 32
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
+        buildConfigField("String", "ADAPTER_VERSION", "\"1.1.0\"")
     }
 
     buildTypes {
