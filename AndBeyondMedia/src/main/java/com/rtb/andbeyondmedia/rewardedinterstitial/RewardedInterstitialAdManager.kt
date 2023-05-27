@@ -69,7 +69,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    LogLevel.ERROR.log(adError.message)
+                    LogLevel.ERROR.log(msg = adError.message)
                     if (firstLook) {
                         firstLook = false
                         val request = createRequest().getAdRequest()
