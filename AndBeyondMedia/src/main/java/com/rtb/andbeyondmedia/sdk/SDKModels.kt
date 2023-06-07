@@ -78,7 +78,10 @@ internal data class SDKConfig(
             val firstLook: Int? = null,
             val other: Int? = null,
             @SerializedName("api_key")
-            val apiKey: String? = null
+            val apiKey: String? = null,
+            @SerializedName("creative_id")
+            val creativeIds: String? = null,
+            val reasons: String? = null
     )
 
     data class RefreshConfig(

@@ -32,6 +32,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
+    private var refreshBlocked = false
 
     init {
         sdkConfig = storeService.config
@@ -173,6 +174,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         bannerConfig.isVisible = visible
     }
 
+    fun adReported(creativeId: String?, reportReasons: List<String>) {
+        if (sdkConfig?.geoEdge?.creativeIds?.replace(" ", "")?.split(",")?.contains(creativeId) == true) {
+            refreshBlocked = true
+        }
+        val configReasons = sdkConfig?.geoEdge?.reasons?.replace(" ", "")?.split(",")
+        configReasons?.forEach { reason ->
+            if (reportReasons.any { reason.contains(it) }) {
+                refreshBlocked = true
+            }
+        }
+    }
+
     fun adFailedToLoad(isPublisherLoad: Boolean) {
         if (bannerConfig.unFilled?.status == 1) {
             startUnfilledRefreshCounter(sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L)
@@ -198,9 +211,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
-        if (sdkConfig?.switch == 1) {
+        if (sdkConfig?.switch == 1 && !refreshBlocked) {
             overridingUnit = null
-            bannerConfig.retryConfig = sdkConfig?.retryConfig
+            bannerConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
             unfilledRefreshCounter?.cancel()
             val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
             var isNetworkBlocked = false

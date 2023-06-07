@@ -1,6 +1,8 @@
 package com.rtb.andbeyondmedia.intersitial
 
 import android.app.Activity
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.LoadAdError
@@ -23,6 +25,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     private var shouldBeActive: Boolean = false
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
+    private var overridingUnit: String? = null
 
     init {
         sdkConfig = storeService.config
@@ -62,22 +65,56 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             AdManagerInterstitialAd.load(context, adUnit, adRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
                     firstLook = false
+                    interstitialConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
                     callBack(interstitialAd)
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
                     LogLevel.ERROR.log(msg = adError.message)
+                    val tempStatus = firstLook
                     if (firstLook) {
                         firstLook = false
-                        val request = createRequest().getAdRequest()
-                        if (interstitialConfig.unFilled?.status == 1 && request != null) {
-                            loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), request, callBack)
-                        }
-                    } else {
+                    }
+                    try {
+                        adFailedToLoad(tempStatus, callBack)
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
                         callBack(null)
                     }
                 }
             })
+        }
+    }
+
+    private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+        fun requestAd() {
+            createRequest().getAdRequest()?.let {
+                loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
+            }
+        }
+        if (interstitialConfig.unFilled?.status == 1) {
+            if (firstLook) {
+                requestAd()
+            } else {
+                if ((interstitialConfig.retryConfig?.retries ?: 0) > 0) {
+                    interstitialConfig.retryConfig?.retries = (interstitialConfig.retryConfig?.retries ?: 0) - 1
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        interstitialConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                            interstitialConfig.retryConfig?.adUnits?.removeAt(0)
+                            overridingUnit = it
+                            requestAd()
+                        } ?: kotlin.run {
+                            overridingUnit = null
+                            callBack(null)
+                        }
+                    }, (interstitialConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                } else {
+                    overridingUnit = null
+                    callBack(null)
+                }
+            }
+        } else {
+            callBack(null)
         }
     }
 
@@ -124,13 +161,14 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
+            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
             hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
         }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return String.format("%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
+        return overridingUnit ?: String.format("%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
     }
 
     private fun createRequest() = AdRequest().Builder().apply {

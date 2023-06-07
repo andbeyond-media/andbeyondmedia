@@ -14,6 +14,7 @@ import com.google.android.gms.ads.appopen.AppOpenAd
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.LogLevel
+import com.rtb.andbeyondmedia.sdk.AdLoadCallback
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.OnShowAdCompleteListener
@@ -21,16 +22,17 @@ import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import java.util.Date
 
-class AppOpenAdManager(private val context: Context, private var adUnit: String) {
+class AppOpenAdManager(private val context: Context, adUnit: String?) {
     private var appOpenAd: AppOpenAd? = null
     private var isLoadingAd = false
     private var loadTime: Long = 0
     private var sdkConfig: SDKConfig? = null
     private val storeService = AndBeyondMedia.getStoreService(context)
-    private var appOpenCofig = AppOpenConfig()
+    private var appOpenConfig = AppOpenConfig()
     private var shouldBeActive: Boolean = false
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
+    private var loadingAdUnit: String? = adUnit
     var fullScreenContentCallback: com.rtb.andbeyondmedia.sdk.FullScreenContentCallback? = null
     var isShowingAd = false
 
@@ -39,34 +41,34 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
-    private fun load(context: Context) {
-        if (isLoadingAd || isAdAvailable()) {
+    private fun load(context: Context, adLoadCallback: AdLoadCallback? = null) {
+        if (isLoadingAd || isAdAvailable() || loadingAdUnit == null) {
             return
         }
         var adManagerAdRequest = createRequest().getAdRequest() ?: return
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (appOpenCofig.isNewUnit) {
+                if (appOpenConfig.isNewUnit) {
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
-                        loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest)
+                        loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest, adLoadCallback)
                     }
-                } else if (appOpenCofig.hijack?.status == 1) {
+                } else if (appOpenConfig.hijack?.status == 1) {
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
-                        loadAd(context, getAdUnitName(false, hijacked = true, newUnit = false), adManagerAdRequest)
+                        loadAd(context, getAdUnitName(false, hijacked = true, newUnit = false), adManagerAdRequest, adLoadCallback)
                     }
                 } else {
-                    loadAd(context, adUnit, adManagerAdRequest)
+                    loadAd(context, loadingAdUnit!!, adManagerAdRequest, adLoadCallback)
                 }
             } else {
-                loadAd(context, adUnit, adManagerAdRequest)
+                loadAd(context, loadingAdUnit!!, adManagerAdRequest, adLoadCallback)
             }
         }
     }
 
-    private fun loadAd(context: Context, adUnit: String, adRequest: AdManagerAdRequest) {
+    private fun loadAd(context: Context, adUnit: String, adRequest: AdManagerAdRequest, adLoadCallback: AdLoadCallback?) {
         isLoadingAd = true
         AppOpenAd.load(context, adUnit, adRequest, object : AppOpenAd.AppOpenAdLoadCallback() {
             override fun onAdLoaded(ad: AppOpenAd) {
@@ -74,7 +76,8 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
                 appOpenAd = ad
                 isLoadingAd = false
                 loadTime = Date().time
-                appOpenCofig.retryConfig = sdkConfig?.retryConfig
+                appOpenConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                adLoadCallback?.onAdLoaded()
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -85,39 +88,43 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
                     firstLook = false
                 }
                 try {
-                    adFailedToLoad(context, tempStatus)
-                } catch (e: Exception) {
+                    adFailedToLoad(context, tempStatus, adLoadCallback)
+                } catch (e: Throwable) {
                     e.printStackTrace()
+                    adLoadCallback?.onAdFailedToLoad(loadAdError.message)
                 }
             }
         })
     }
 
-    private fun adFailedToLoad(context: Context, firstLook: Boolean) {
+    private fun adFailedToLoad(context: Context, firstLook: Boolean, adLoadCallback: AdLoadCallback?) {
         fun requestAd() {
             createRequest().getAdRequest()?.let {
-                loadAd(context, getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it)
+                loadAd(context, getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, adLoadCallback)
             }
         }
-        if (appOpenCofig.unFilled?.status == 1) {
+        if (appOpenConfig.unFilled?.status == 1) {
             if (firstLook) {
                 requestAd()
             } else {
-                if ((appOpenCofig.retryConfig?.retries ?: 0) > 0) {
-                    appOpenCofig.retryConfig?.retries = (appOpenCofig.retryConfig?.retries ?: 0) - 1
+                adLoadCallback?.onAdFailedToLoad("")
+                if ((appOpenConfig.retryConfig?.retries ?: 0) > 0) {
+                    appOpenConfig.retryConfig?.retries = (appOpenConfig.retryConfig?.retries ?: 0) - 1
                     Handler(Looper.getMainLooper()).postDelayed({
-                        appOpenCofig.retryConfig?.adUnits?.firstOrNull()?.let {
-                            appOpenCofig.retryConfig?.adUnits?.removeAt(0)
+                        appOpenConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                            appOpenConfig.retryConfig?.adUnits?.removeAt(0)
                             overridingUnit = it
                             requestAd()
                         } ?: kotlin.run {
                             overridingUnit = null
                         }
-                    }, (appOpenCofig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                    }, (appOpenConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
                 } else {
                     overridingUnit = null
                 }
             }
+        } else {
+            adLoadCallback?.onAdFailedToLoad("")
         }
     }
 
@@ -149,20 +156,22 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
 
     private fun setConfig() {
         if (!shouldBeActive) return
-        if (sdkConfig?.getBlockList()?.contains(adUnit) == true) {
+        if (sdkConfig?.getBlockList()?.contains(loadingAdUnit) == true) {
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.APPOPEN || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config ->
+            config.specific?.equals(loadingAdUnit, true) == true || config.type == AdTypes.APPOPEN || config.type == "all"
+        }
         if (validConfig == null) {
             shouldBeActive = false
             return
         }
         val networkName = if (sdkConfig?.networkCode.isNullOrEmpty()) sdkConfig?.networkId else String.format("%s,%s", sdkConfig?.networkId, sdkConfig?.networkCode)
-        appOpenCofig.apply {
+        appOpenConfig.apply {
             customUnitName = String.format("/%s/%s-%s", networkName, sdkConfig?.affiliatedId.toString(), validConfig.nameType ?: "")
             position = validConfig.position ?: 0
-            isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
+            isNewUnit = loadingAdUnit?.contains(sdkConfig?.networkId ?: "") ?: false
             retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
             newUnit = sdkConfig?.hijackConfig?.newUnit
             hijack = sdkConfig?.hijackConfig?.appOpen ?: sdkConfig?.hijackConfig?.other
@@ -172,19 +181,19 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
     }
 
     private fun isAdAvailable(): Boolean {
-        return if (appOpenCofig.expriry != 0) {
-            appOpenAd != null && wasLoadTimeLessThanNHoursAgo(appOpenCofig.expriry.toLong())
+        return if (appOpenConfig.expriry != 0) {
+            appOpenAd != null && wasLoadTimeLessThanNHoursAgo(appOpenConfig.expriry.toLong())
         } else {
             appOpenAd != null
         }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", appOpenCofig.customUnitName, if (unfilled) appOpenCofig.unFilled?.number else if (newUnit) appOpenCofig.newUnit?.number else if (hijacked) appOpenCofig.hijack?.number else appOpenCofig.position)
+        return overridingUnit ?: String.format("%s-%d", appOpenConfig.customUnitName, if (unfilled) appOpenConfig.unFilled?.number else if (newUnit) appOpenConfig.newUnit?.number else if (hijacked) appOpenConfig.hijack?.number else appOpenConfig.position)
     }
 
     private fun createRequest() = AdRequest().Builder().apply {
-        addCustomTargeting("adunit", adUnit)
+        addCustomTargeting("adunit", loadingAdUnit ?: "")
         addCustomTargeting("hb_format", "amp")
     }.build()
 
@@ -239,5 +248,14 @@ class AppOpenAdManager(private val context: Context, private var adUnit: String)
         }
         isShowingAd = true
         appOpenAd?.show(activity)
+    }
+
+    fun prepareAd(adUnit: String?, adLoadCallback: AdLoadCallback) {
+        adUnit?.let { loadingAdUnit = it }
+        if (context is Activity) {
+            load(context, adLoadCallback)
+        } else {
+            adLoadCallback.onAdFailedToLoad("")
+        }
     }
 }

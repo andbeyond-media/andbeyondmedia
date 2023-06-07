@@ -14,6 +14,9 @@ class AndBeyondAdapter : Adapter() {
 
     private lateinit var bannerLoader: AndBeyondBannerLoader
     private lateinit var interstitialLoader: AndBeyondInterstitialLoader
+    private lateinit var rewardedLoaded: RewardedLoader
+    private lateinit var rewardedInterstitialLoader: RewardedInterstitialLoader
+    private lateinit var appOpenAdLoader: AppOpenAdLoader
     private val TAG: String = this::class.java.simpleName
 
     companion object {
@@ -57,5 +60,23 @@ class AndBeyondAdapter : Adapter() {
         LogLevel.INFO.log(TAG, "loadInterstitialAd:")
         interstitialLoader = AndBeyondInterstitialLoader(mediationInterstitialAdConfiguration, callback)
         interstitialLoader.loadAd()
+    }
+
+    override fun loadAppOpenAd(mediationAppOpenAdConfiguration: MediationAppOpenAdConfiguration, callback: MediationAdLoadCallback<MediationAppOpenAd, MediationAppOpenAdCallback>) {
+        LogLevel.INFO.log(TAG, "loadAppOpenAd:")
+        appOpenAdLoader = AppOpenAdLoader(mediationAppOpenAdConfiguration, callback)
+        appOpenAdLoader.loadAd()
+    }
+
+    override fun loadRewardedAd(mediationRewardedAdConfiguration: MediationRewardedAdConfiguration, callback: MediationAdLoadCallback<MediationRewardedAd, MediationRewardedAdCallback>) {
+        LogLevel.INFO.log(TAG, "loadRewardedAd:")
+        rewardedLoaded = RewardedLoader(mediationRewardedAdConfiguration, callback)
+        rewardedLoaded.loadAd()
+    }
+
+    override fun loadRewardedInterstitialAd(mediationRewardedAdConfiguration: MediationRewardedAdConfiguration, callback: MediationAdLoadCallback<MediationRewardedAd, MediationRewardedAdCallback>) {
+        LogLevel.INFO.log(TAG, "loadRewardedInterstitialAd:")
+        rewardedInterstitialLoader = RewardedInterstitialLoader(mediationRewardedAdConfiguration, callback)
+        rewardedInterstitialLoader.loadAd()
     }
 }

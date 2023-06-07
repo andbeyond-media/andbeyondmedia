@@ -29,3 +29,8 @@ interface BannerAdListener {
 fun interface OnShowAdCompleteListener {
     fun onShowAdComplete()
 }
+
+interface AdLoadCallback {
+    fun onAdLoaded()
+    fun onAdFailedToLoad(error: String)
+}

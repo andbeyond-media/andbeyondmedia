@@ -3,12 +3,16 @@ package com.rtb.andbeyondmedia.banners
 import android.content.Context
 import android.util.AttributeSet
 import android.widget.LinearLayout
+import com.appharbr.sdk.engine.AdBlockReason
 import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
+import com.appharbr.sdk.engine.adformat.AdFormat
+import com.appharbr.sdk.engine.listeners.AHIncident
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdView
+import com.google.gson.Gson
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -122,21 +126,30 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (it) {
                     bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
                     adRequest = bannerManager.checkOverride() ?: adRequest
-                    bannerManager.checkGeoEdge(true) { addGeoEdge() }
+                    bannerManager.checkGeoEdge(true) { addGeoEdge(true) }
                 }
                 load()
             }
         } else {
-            bannerManager.checkGeoEdge(false) { addGeoEdge() }
+            bannerManager.checkGeoEdge(false) { addGeoEdge(false) }
             load()
         }
         return true
     }
 
-    private fun addGeoEdge() {
-        AppHarbr.addBannerView(AdSdk.GAM, adView) { _, _, _, reasons ->
-            LogLevel.INFO.log(msg = "AppHarbr - On Banner Blocked $reasons")
-        }
+    private fun addGeoEdge(firstLook: Boolean) {
+        AppHarbr.addBannerView(AdSdk.GAM, adView, object : AHIncident {
+            override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
+                LogLevel.INFO.log(msg = "AppHarbr - On Banner Blocked ${Gson().toJson(reasons.asList().map { it.reason })}")
+            }
+
+            override fun onAdIncident(view: Any?, unitId: String?, adNetwork: AdSdk?, creativeId: String?, adFormat: AdFormat, blockReasons: Array<out AdBlockReason>, reportReasons: Array<out AdBlockReason>) {
+                LogLevel.INFO.log(msg = "AppHarbr - On Banner reported ${Gson().toJson(reportReasons.asList().map { it.reason })}")
+                if (firstLook) {
+                    bannerManager.adReported(creativeId, reportReasons.asList().map { it.reason })
+                }
+            }
+        })
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
