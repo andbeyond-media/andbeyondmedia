@@ -11,8 +11,8 @@ import com.google.android.gms.ads.mediation.MediationRewardedAdCallback
 import com.google.android.gms.ads.mediation.MediationRewardedAdConfiguration
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.sdk.AndBeyondError
+import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.log
 
 class RewardedLoader(private val mediationRewardedAdConfiguration: MediationRewardedAdConfiguration,
@@ -24,13 +24,13 @@ class RewardedLoader(private val mediationRewardedAdConfiguration: MediationRewa
     private val TAG: String = this::class.java.simpleName
 
     fun loadAd() {
-        LogLevel.INFO.log(TAG, "Begin loading rewarded ad.")
+        Logger.INFO.log(TAG, "Begin loading rewarded ad.")
         val serverParameter = mediationRewardedAdConfiguration.serverParameters.getString("parameter")
         if (serverParameter.isNullOrEmpty()) {
             mediationAdLoadCallback.onFailure(AndBeyondError.createCustomEventNoAdIdError())
             return
         }
-        LogLevel.INFO.log(TAG, "Received server parameter. $serverParameter")
+        Logger.INFO.log(TAG, "Received server parameter. $serverParameter")
         val context = mediationRewardedAdConfiguration.context
         val request = AndBeyondAdapter.createAdRequest(mediationRewardedAdConfiguration)
         RewardedAd.load(context, serverParameter, request, this)

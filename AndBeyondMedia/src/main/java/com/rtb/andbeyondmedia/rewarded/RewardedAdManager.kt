@@ -11,10 +11,10 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.RewardedVideoAdUnit
@@ -71,7 +71,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    LogLevel.ERROR.log(msg = adError.message)
+                    Logger.ERROR.log(msg = adError.message)
                     val tempStatus = firstLook
                     if (firstLook) {
                         firstLook = false
@@ -150,7 +150,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDED || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDED || config.type.equals("all", true) }
         if (validConfig == null) {
             shouldBeActive = false
             return

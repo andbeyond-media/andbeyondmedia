@@ -11,10 +11,10 @@ import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.InterstitialAdUnit
@@ -73,7 +73,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    LogLevel.ERROR.log(msg = adError.message)
+                    Logger.ERROR.log(msg = adError.message)
                     val tempStatus = firstLook
                     if (firstLook) {
                         firstLook = false
@@ -153,7 +153,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
             shouldBeActive = false
             return
         }
-        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDEDINTERSTITIAL || config.type == "all" }
+        val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(adUnit, true) == true || config.type == AdTypes.REWARDEDINTERSTITIAL || config.type.equals("all", true) }
         if (validConfig == null) {
             shouldBeActive = false
             return

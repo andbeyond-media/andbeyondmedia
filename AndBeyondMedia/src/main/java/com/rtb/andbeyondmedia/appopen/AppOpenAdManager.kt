@@ -13,10 +13,10 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.sdk.AdLoadCallback
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.OnShowAdCompleteListener
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
@@ -72,7 +72,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         isLoadingAd = true
         AppOpenAd.load(context, adUnit, adRequest, object : AppOpenAd.AppOpenAdLoadCallback() {
             override fun onAdLoaded(ad: AppOpenAd) {
-                LogLevel.INFO.log(msg = "AppOpen ad loaded")
+                Logger.INFO.log(msg = "AppOpen ad loaded")
                 appOpenAd = ad
                 isLoadingAd = false
                 loadTime = Date().time
@@ -81,7 +81,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                LogLevel.ERROR.log(msg = loadAdError.message)
+                Logger.ERROR.log(msg = loadAdError.message)
                 isLoadingAd = false
                 val tempStatus = firstLook
                 if (firstLook) {
@@ -161,7 +161,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             return
         }
         val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config ->
-            config.specific?.equals(loadingAdUnit, true) == true || config.type == AdTypes.APPOPEN || config.type == "all"
+            config.specific?.equals(loadingAdUnit, true) == true || config.type == AdTypes.APPOPEN || config.type.equals("all", true)
         }
         if (validConfig == null) {
             shouldBeActive = false
@@ -206,11 +206,11 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
 
     fun showAdIfAvailable(activity: Activity, onShowAdCompleteListener: OnShowAdCompleteListener) {
         if (isShowingAd) {
-            LogLevel.INFO.log(msg = "The app open ad is already showing.")
+            Logger.INFO.log(msg = "The app open ad is already showing.")
             return
         }
         if (!isAdAvailable()) {
-            LogLevel.ERROR.log(msg = "The app open ad is not ready yet.")
+            Logger.ERROR.log(msg = "The app open ad is not ready yet.")
             onShowAdCompleteListener.onShowAdComplete()
             load(activity)
             return
@@ -227,7 +227,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                 fullScreenContentCallback?.onAdFailedToShowFullScreenContent(adError.message)
-                LogLevel.ERROR.log(msg = adError.message)
+                Logger.ERROR.log(msg = adError.message)
                 appOpenAd = null
                 isShowingAd = false
                 onShowAdCompleteListener.onShowAdComplete()

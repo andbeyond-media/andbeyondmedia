@@ -3,6 +3,10 @@ package com.rtb.andbeyondmedia.banners
 import android.content.Context
 import android.util.AttributeSet
 import android.widget.LinearLayout
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.appharbr.sdk.engine.AdBlockReason
 import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
@@ -16,7 +20,6 @@ import com.google.gson.Gson
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
@@ -36,6 +39,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private lateinit var currentAdSizes: List<AdSize>
     private var firstLook = true
     private var bannerAdListener: BannerAdListener? = null
+    private var impressionOnce = false
+    private lateinit var viewState: Lifecycle.Event
 
     constructor(context: Context) : super(context) {
         init(context, null)
@@ -55,6 +60,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     private fun init(context: Context, attrs: AttributeSet?) {
         this.mContext = context
+        attachLifecycle(mContext)
         bannerManager = BannerManager(context, this)
         val view = inflate(context, R.layout.banner_ad_view, this)
         binding = BannerAdViewBinding.bind(view)
@@ -85,6 +91,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         adView.adListener = adListener
         binding.root.removeAllViews()
         binding.root.addView(adView)
+        log { "attachAdView : $adUnitId" }
     }
 
     fun setAdSize(adSize: BannerAdSize) = setAdSizes(adSize)
@@ -118,6 +125,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         var adRequest = request.getAdRequest() ?: return false
         fun load() {
             if (this::adView.isInitialized) {
+                log { "loadAd&load : ${Gson().toJson(adRequest.customTargeting)}" }
                 bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
             }
         }
@@ -138,13 +146,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     private fun addGeoEdge(firstLook: Boolean) {
+        log { "addGeoEdge : $firstLook" }
         AppHarbr.addBannerView(AdSdk.GAM, adView, object : AHIncident {
             override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
-                LogLevel.INFO.log(msg = "AppHarbr - On Banner Blocked ${Gson().toJson(reasons.asList().map { it.reason })}")
+                log { "onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
             }
 
             override fun onAdIncident(view: Any?, unitId: String?, adNetwork: AdSdk?, creativeId: String?, adFormat: AdFormat, blockReasons: Array<out AdBlockReason>, reportReasons: Array<out AdBlockReason>) {
-                LogLevel.INFO.log(msg = "AppHarbr - On Banner reported ${Gson().toJson(reportReasons.asList().map { it.reason })}")
+                log { "onAdIncident : ${Gson().toJson(reportReasons.asList().map { it.reason })}" }
                 if (firstLook) {
                     bannerManager.adReported(creativeId, reportReasons.asList().map { it.reason })
                 }
@@ -160,7 +169,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private val adListener = object : AdListener() {
         override fun onAdClicked() {
             super.onAdClicked()
-            bannerManager.clearConfig()
             bannerAdListener?.onAdClicked()
         }
 
@@ -171,21 +179,27 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
-            bannerAdListener?.onAdFailedToLoad(p0.toString())
             val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
             }
-            try {
+            val retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
             } catch (e: Exception) {
                 e.printStackTrace()
+                false
+            }
+            if (bannerManager.allowCallback(tempStatus)) {
+                bannerAdListener?.onAdFailedToLoad(p0.toString(), retryStatus)
             }
         }
 
         override fun onAdImpression() {
             super.onAdImpression()
-            bannerAdListener?.onAdImpression()
+            if (!impressionOnce) {
+                impressionOnce = true
+                bannerAdListener?.onAdImpression()
+            }
             bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
@@ -194,7 +208,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdLoaded() {
             super.onAdLoaded()
-            bannerAdListener?.onAdLoaded()
+            if (bannerManager.allowCallback(firstLook)) {
+                bannerAdListener?.onAdLoaded()
+            }
             bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
@@ -214,24 +230,59 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
+    private fun attachLifecycle(context: Context) {
+        viewState = Lifecycle.Event.ON_CREATE
+        try {
+            var lifecycle: Lifecycle? = null
+            if (context is LifecycleOwner) {
+                lifecycle = context.lifecycle
+            }
+            if (lifecycle == null) {
+                lifecycle = (mContext as? AppCompatActivity)?.lifecycle
+            }
+
+            lifecycle?.addObserver(object : LifecycleEventObserver {
+                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        resumeAd()
+                    }
+                    if (event == Lifecycle.Event.ON_PAUSE) {
+                        pauseAd()
+                    }
+                    if (event == Lifecycle.Event.ON_DESTROY) {
+                        destroyAd()
+                        lifecycle.removeObserver(this)
+                    }
+                }
+            })
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+
     fun pauseAd() {
-        if (this::adView.isInitialized) {
+        if (this::adView.isInitialized && this::viewState.isInitialized && viewState != Lifecycle.Event.ON_PAUSE) {
+            viewState = Lifecycle.Event.ON_PAUSE
             adView.pause()
             bannerManager.adPaused()
         }
     }
 
     fun resumeAd() {
-        if (this::adView.isInitialized) {
+        if (this::adView.isInitialized && this::viewState.isInitialized && viewState != Lifecycle.Event.ON_RESUME) {
+            viewState = Lifecycle.Event.ON_RESUME
             adView.resume()
             bannerManager.adResumed()
         }
     }
 
     fun destroyAd() {
-        if (this::adView.isInitialized) {
+        if (this::adView.isInitialized && this::viewState.isInitialized && viewState != Lifecycle.Event.ON_DESTROY) {
+            viewState = Lifecycle.Event.ON_DESTROY
             adView.destroy()
             bannerManager.adDestroyed()
         }
     }
+
+
 }

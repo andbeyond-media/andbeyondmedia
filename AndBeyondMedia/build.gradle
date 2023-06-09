@@ -12,12 +12,12 @@ android {
         targetSdk 32
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
-        buildConfigField("String", "ADAPTER_VERSION", "\"1.1.1\"")
+        buildConfigField("String", "ADAPTER_VERSION", "\"1.1.2\"")
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -61,7 +61,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.andbeyond-media'
             artifactId = 'andbeyondmedia'
-            version = '1.1.1'
+            version = '1.1.2'
 
             afterEvaluate {
                 from components.release

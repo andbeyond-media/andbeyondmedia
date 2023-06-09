@@ -26,10 +26,10 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
         loadAd()
-        /*loadInterstitial()
-        loadInterstitialRewarded()
-        loadRewarded()
-        loadAdaptiveAd()*/
+        //loadInterstitial()
+        //loadInterstitialRewarded()
+        //loadRewarded()
+        //loadAdaptiveAd()
     }
 
     private fun init() {
@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
 
 
     private fun loadInterstitial() {
-        interstitialAd = InterstitialAd(this, "/6499/example/interstitial")
+        interstitialAd = InterstitialAd(this, "/21952429235,22885371519/695202-INTERSTITIAL-1")
         interstitialAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
             binding.showInterstitial.isEnabled = it
         }
@@ -147,7 +147,8 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     override fun onAdClosed() {
     }
 
-    override fun onAdFailedToLoad(error: String) {
+    override fun onAdFailedToLoad(error: String, retrying: Boolean) {
+        Log.d("Ads", "onAdFailedToLoad & Retrying $retrying")
     }
 
     override fun onAdImpression() {

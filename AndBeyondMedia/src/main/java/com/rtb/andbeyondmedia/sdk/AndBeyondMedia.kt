@@ -9,7 +9,6 @@ import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
-import com.rtb.andbeyondmedia.common.LogLevel
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
@@ -27,14 +26,13 @@ object AndBeyondMedia {
     private var storeService: StoreService? = null
     private var configService: ConfigService? = null
     private var workManager: WorkManager? = null
-    private var logEnabled = false
+    internal var logEnabled = false
+    internal var specialTag: String? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         this.logEnabled = logsEnabled
         fetchConfig(context)
     }
-
-    internal fun logEnabled() = logEnabled
 
     internal fun getStoreService(context: Context): StoreService {
         @Synchronized
@@ -48,9 +46,9 @@ object AndBeyondMedia {
         @Synchronized
         if (configService == null) {
             val client = OkHttpClient.Builder()
-                    .connectTimeout(5, TimeUnit.SECONDS)
-                    .writeTimeout(5, TimeUnit.SECONDS)
-                    .readTimeout(5, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
+                    .connectTimeout(3, TimeUnit.SECONDS)
+                    .writeTimeout(3, TimeUnit.SECONDS)
+                    .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
             configService = Retrofit.Builder().baseUrl(BASE_URL).client(client)
                     .addConverterFactory(GsonConverterFactory.create()).build().create(ConfigService::class.java)
         }
@@ -79,6 +77,8 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
+                    specialTag = storeService.config?.infoConfig?.specialTag
+                    logEnabled = (logEnabled || storeService.config?.infoConfig?.normalInfo == 1)
                     SDKManager.initialize(context)
                     if (storeService.config != null && storeService.config?.refetch != null) {
                         fetchConfig(context, storeService.config?.refetch)
@@ -106,7 +106,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
                 } ?: Result.failure()
             }
         } catch (e: Exception) {
-            LogLevel.ERROR.log(msg = e.message ?: "")
+            Logger.ERROR.log(msg = e.message ?: "")
             storeService.config?.let {
                 Result.success()
             } ?: Result.failure()
@@ -130,7 +130,7 @@ internal object SDKManager {
         PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
         PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
-        PrebidMobile.initializeSdk(context) { LogLevel.INFO.log(msg = "Prebid Initialization Completed") }
+        PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
         prebid?.schain?.let {
             TargetingParams.setUserExt(Ext().apply {
                 put("schain", it)
@@ -140,7 +140,7 @@ internal object SDKManager {
 
     private fun initializeGAM(context: Context) {
         MobileAds.initialize(context) {
-            LogLevel.INFO.log(msg = "GAM Initialization complete.")
+            Logger.INFO.log(msg = "GAM Initialization complete.")
         }
     }
 
@@ -149,11 +149,11 @@ internal object SDKManager {
         val configuration = AHSdkConfiguration.Builder(apiKey).build()
         AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
             override fun onSuccess() {
-                LogLevel.INFO.log(msg = "AppHarbr SDK Initialized Successfully")
+                Logger.INFO.log(msg = "AppHarbr SDK Initialized Successfully")
             }
 
             override fun onFailure(reason: InitializationFailureReason) {
-                LogLevel.ERROR.log(msg = "AppHarbr SDK Initialization Failed: ${reason.readableHumanReason}")
+                Logger.ERROR.log(msg = "AppHarbr SDK Initialization Failed: ${reason.readableHumanReason}")
             }
 
         })
