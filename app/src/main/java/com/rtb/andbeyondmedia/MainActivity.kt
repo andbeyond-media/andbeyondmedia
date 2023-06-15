@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
         loadAd()
-        //loadInterstitial()
+        loadInterstitial()
         //loadInterstitialRewarded()
         //loadRewarded()
         //loadAdaptiveAd()

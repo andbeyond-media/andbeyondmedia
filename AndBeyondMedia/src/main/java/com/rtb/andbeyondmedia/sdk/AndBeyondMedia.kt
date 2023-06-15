@@ -72,9 +72,14 @@ object AndBeyondMedia {
             } ?: kotlin.run {
                 OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
             }
+            val workName: String = delay?.let {
+                String.format("%s_%s", ConfigSetWorker::class.java.simpleName, it.toString())
+            } ?: kotlin.run {
+                ConfigSetWorker::class.java.simpleName
+            }
             val workManager = getWorkManager(context)
             val storeService = getStoreService(context)
-            workManager.enqueueUniqueWork(ConfigSetWorker::class.java.simpleName, ExistingWorkPolicy.REPLACE, workerRequest)
+            workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
                     specialTag = storeService.config?.infoConfig?.specialTag

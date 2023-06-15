@@ -1,8 +1,10 @@
 package com.rtb.andbeyondmedia.intersitial
 
+import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 
+@Keep
 internal data class InterstitialConfig(
         @SerializedName("customUnitName")
         var customUnitName: String = "",

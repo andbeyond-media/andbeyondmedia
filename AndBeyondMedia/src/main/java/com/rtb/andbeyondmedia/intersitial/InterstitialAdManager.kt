@@ -5,10 +5,16 @@ import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
+import com.appharbr.sdk.engine.AdBlockReason
+import com.appharbr.sdk.engine.AdSdk
+import com.appharbr.sdk.engine.AppHarbr
+import com.appharbr.sdk.engine.adformat.AdFormat
+import com.appharbr.sdk.engine.listeners.AHIncident
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAd
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAdLoadCallback
+import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
@@ -26,6 +32,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
+    private var otherUnit = false
 
     init {
         sdkConfig = storeService.config
@@ -61,12 +68,14 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+        otherUnit = adUnit != this.adUnit
         fetchDemand(adRequest) {
             AdManagerInterstitialAd.load(context, adUnit, adRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
-                    firstLook = false
                     interstitialConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                    addGeoEdge(interstitialAd, otherUnit)
                     callBack(interstitialAd)
+                    firstLook = false
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
@@ -83,6 +92,26 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     }
                 }
             })
+        }
+    }
+
+    private fun addGeoEdge(interstitialAd: AdManagerInterstitialAd, otherUnit: Boolean) {
+        try {
+            val number = (1..100).random()
+            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
+                    (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
+                AppHarbr.addInterstitial(AdSdk.GAM, interstitialAd, object : AHIncident {
+                    override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
+                        log { "Interstitial : onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
+                    }
+
+                    override fun onAdIncident(p0: Any?, p1: String?, p2: AdSdk?, p3: String?, p4: AdFormat, p5: Array<out AdBlockReason>, reportReasons: Array<out AdBlockReason>) {
+                        log { "Banner: onAdIncident : ${Gson().toJson(reportReasons.asList().map { it.reason })}" }
+                    }
+                })
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -177,11 +206,11 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }.build()
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
-        if (sdkConfig?.prebid?.other != 1) {
-            callback()
-        } else {
-            val adUnit = InterstitialAdUnit((interstitialConfig.placement?.other ?: 0).toString(), 50, 70)
+        if ((!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)) {
+            val adUnit = InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), 50, 70)
             adUnit.fetchDemand(adRequest) { callback() }
+        } else {
+            callback()
         }
     }
 }

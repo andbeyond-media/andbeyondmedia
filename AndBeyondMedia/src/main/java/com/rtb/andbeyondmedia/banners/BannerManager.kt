@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.AdSize
@@ -22,7 +23,7 @@ import org.prebid.mobile.BannerAdUnit
 import java.util.Date
 import kotlin.math.ceil
 
-internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener) {
+internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener, private val view: View? = null) {
 
     private var activeTimeCounter: CountDownTimer? = null
     private var passiveTimeCounter: CountDownTimer? = null
@@ -35,7 +36,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
     private var refreshBlocked = false
-    private var loadedOnce = false
 
     init {
         sdkConfig = storeService.config
@@ -103,7 +103,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String) {
-        log { String.format("%s:%s", "setConfig", "entry") }
+        view.log { String.format("%s:%s", "setConfig", "entry") }
         if (!shouldBeActive()) return
         if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it) } == true) {
             shouldBeActive = false
@@ -136,7 +136,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 adSizes
             }
         }
-        log { String.format("%s:%s", "setConfig", Gson().toJson(bannerConfig)) }
+        view.log { String.format("%s:%s", "setConfig", Gson().toJson(bannerConfig)) }
     }
 
     private fun getNetworkName(): String? {
@@ -192,6 +192,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adFailedToLoad(isPublisherLoad: Boolean): Boolean {
+        view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
+        view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
         if (bannerConfig.unFilled?.status == 1) {
             startUnfilledRefreshCounter(sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L)
             if (isPublisherLoad) {
@@ -221,7 +223,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
-        loadedOnce = true
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
             overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
@@ -244,7 +245,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false, timers: Int? = null) {
-        log { "startRefreshing: $resetVisibleTime $isPublisherLoad $timers" }
+        view.log { "startRefreshing: $resetVisibleTime $isPublisherLoad $timers" }
         if (resetVisibleTime) {
             bannerConfig.isVisibleFor = 0
         }
@@ -311,6 +312,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun refresh(active: Int = 1, unfilled: Boolean = false) {
+        if (unfilled) {
+            view.log { "Retrying" }
+        }
         val currentTimeStamp = Date().time
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
         val timers = if (active == 0 && unfilled) {
@@ -359,11 +363,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun checkOverride(): AdManagerAdRequest? {
         if (bannerConfig.isNewUnit && bannerConfig.newUnit?.status == 1) {
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = false, newUnit = true), bannerConfig.adSizes)
-            log { "checkOverride: new Unit" }
+            view.log { "checkOverride: new Unit" }
             return createRequest(1).getAdRequest()
         } else if (bannerConfig.hijack?.status == 1) {
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes)
-            log { "checkOverride: hijack" }
+            view.log { "checkOverride: hijack" }
             return createRequest(1).getAdRequest()
         }
         return null
@@ -379,6 +383,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: () -> Unit) {
         if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
+            view.log { "Fetch Demand with firstlook:  $firstLook and placement:  ${Gson().toJson(bannerConfig.placement)}" }
             bannerConfig.placement?.let {
                 if (bannerConfig.adSizes.isNotEmpty()) {
                     val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
@@ -388,9 +393,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     adUnit.fetchDemand(adRequest) { callback() }
                 }
             } ?: callback()
-            log { "checkOverride : with $firstLook ${Gson().toJson(bannerConfig.placement)}" }
+
         } else {
-            log { "checkOverride : without Prebid" }
+            view.log { "Fetch Demand : without Prebid" }
             callback()
         }
     }
@@ -418,8 +423,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         unfilledRefreshCounter?.cancel()
     }
 
-    fun allowCallback(firstLook: Boolean): Boolean {
-        return if (firstLook || !loadedOnce) true
-        else sdkConfig?.infoConfig?.refreshCallbacks == 1
+    fun allowCallback(refreshLoad: Boolean): Boolean {
+        return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 }

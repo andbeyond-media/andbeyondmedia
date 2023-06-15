@@ -12,10 +12,13 @@
         android:theme="@style/Theme.AndBeyondMedia"
         tools:ignore="DataExtractionRules">
         <activity
-            android:name=".GAMActivity"
+            android:name=".ScrollingActivity"
             android:exported="true">
 
         </activity>
+        <activity
+            android:name=".GAMActivity"
+            android:exported="true" />
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize"

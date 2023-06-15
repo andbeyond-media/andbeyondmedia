@@ -1,10 +1,12 @@
 package com.rtb.andbeyondmedia.banners
 
+import androidx.annotation.Keep
 import com.google.android.gms.ads.AdSize
 import com.google.gson.annotations.SerializedName
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import java.util.Date
 
+@Keep
 internal data class BannerConfig(
         @SerializedName("customUnitName")
         var customUnitName: String = "",

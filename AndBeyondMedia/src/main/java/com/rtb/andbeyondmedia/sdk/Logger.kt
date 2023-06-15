@@ -1,6 +1,7 @@
 package com.rtb.andbeyondmedia.sdk
 
 import android.util.Log
+import android.view.View
 import com.rtb.andbeyondmedia.common.TAG
 
 internal enum class Logger {
@@ -20,6 +21,16 @@ internal fun log(getMessage: () -> String) {
     if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
         try {
             Log.i(AndBeyondMedia.specialTag, getMessage())
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+}
+
+internal fun View?.log(getMessage: () -> String) {
+    if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
+        try {
+            Log.i(AndBeyondMedia.specialTag, String.format("%d-%s", this?.id ?: -1, getMessage()))
         } catch (e: Throwable) {
             e.printStackTrace()
         }

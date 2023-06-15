@@ -21,3 +21,9 @@
 #-renamesourcefileattribute SourceFile
 
 -keep class com.rtb.andbeyondmedia.** {*; }
+-keep class com.appharbr.** {*;}
+-keep interface com.appharbr.** {*;}
+-keepclassmembers class com.appharbr.** { public *; }
+-keep class p.haeg.w.** {*;}
+-keep interface p.haeg.w.** {*;}
+-keepclassmembers class cp.haeg.w.** { public *; }

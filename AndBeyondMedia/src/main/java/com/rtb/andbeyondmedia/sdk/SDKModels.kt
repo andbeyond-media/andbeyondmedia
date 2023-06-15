@@ -1,9 +1,10 @@
 package com.rtb.andbeyondmedia.sdk
 
+import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
-
+@Keep
 internal data class SDKConfig(
         @SerializedName("aff")
         val affiliatedId: Long? = null,
@@ -47,12 +48,14 @@ internal data class SDKConfig(
         val unfilledConfig: LoadConfigs? = null
 ) {
 
+    @Keep
     fun getBlockList() = arrayListOf<String>().apply {
         block?.forEach {
             it?.forEach { unit -> add(unit) }
         }
     }
 
+    @Keep
     data class RetryConfig(
             @SerializedName("networks")
             val networks: String? = null,
@@ -63,6 +66,8 @@ internal data class SDKConfig(
             @SerializedName("adUnits")
             var adUnits: ArrayList<String> = arrayListOf()
     ) {
+
+        @Keep
         fun fillAdUnits() {
             adUnits = arrayListOf<String>().apply {
                 addAll(networks?.replace(" ", "")?.split(",") ?: arrayListOf())
@@ -70,6 +75,7 @@ internal data class SDKConfig(
         }
     }
 
+    @Keep
     data class InfoConfig(
             @SerializedName("normal_info")
             val normalInfo: Int? = null,
@@ -79,6 +85,7 @@ internal data class SDKConfig(
             val refreshCallbacks: Int? = null
     )
 
+    @Keep
     data class Prebid(
             @SerializedName("firstlook")
             val firstLook: Int? = null,
@@ -96,6 +103,7 @@ internal data class SDKConfig(
             val schain: String? = null
     )
 
+    @Keep
     data class GeoEdge(
             @SerializedName("firstlook")
             val firstLook: Int? = null,
@@ -109,6 +117,7 @@ internal data class SDKConfig(
             val reasons: String? = null
     )
 
+    @Keep
     data class RefreshConfig(
             @SerializedName("type")
             val type: String? = null,
@@ -128,6 +137,7 @@ internal data class SDKConfig(
             val expiry: Int? = null
     )
 
+    @Keep
     data class Size(
             @SerializedName("width")
             val width: String? = null,
@@ -136,15 +146,18 @@ internal data class SDKConfig(
             @SerializedName("sizes")
             val sizes: List<Size>? = null
     ) {
+        @Keep
         fun toSizes(): String {
             return sizes?.joinToString(",") ?: ""
         }
 
+        @Keep
         override fun toString(): String {
             return String.format("%s x %s", width, height)
         }
     }
 
+    @Keep
     data class Placement(
             @SerializedName("firstlook")
             val firstLook: String? = null,
@@ -152,6 +165,7 @@ internal data class SDKConfig(
             val other: String? = null
     )
 
+    @Keep
     data class LoadConfigs(
             @SerializedName("INTERSTITIAL")
             val inter: LoadConfig? = null,
@@ -179,6 +193,7 @@ internal data class SDKConfig(
             val other: LoadConfig? = null
     )
 
+    @Keep
     data class LoadConfig(
             @SerializedName("status")
             val status: Int? = null,
