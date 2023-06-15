@@ -13,9 +13,7 @@
         tools:ignore="DataExtractionRules">
         <activity
             android:name=".ScrollingActivity"
-            android:exported="true">
-
-        </activity>
+            android:exported="true" />
         <activity
             android:name=".GAMActivity"
             android:exported="true" />

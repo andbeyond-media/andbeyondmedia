@@ -8,7 +8,7 @@
 
     <TextView
         android:layout_width="match_parent"
-        android:layout_height="300dp" />
+        android:layout_height="600dp" />
 
     <com.rtb.andbeyondmedia.banners.BannerAdView
         android:id="@+id/banner_ad"

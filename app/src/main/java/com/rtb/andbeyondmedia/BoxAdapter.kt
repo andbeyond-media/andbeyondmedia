@@ -26,14 +26,15 @@ class BoxAdapter(private val context: Context, private val boxes: List<String>) 
             }
 
             override fun onAdFailedToLoad(error: String, retrying: Boolean) {
-                Log.d("Sonu", "$tempPost onAdFailedToLoad: $retrying , $error")
+                Log.d("Ads", "$tempPost onAdFailedToLoad: $retrying , $error")
             }
 
             override fun onAdImpression() {
+                Log.d("Ads", "$tempPost onAdImpression: ")
             }
 
             override fun onAdLoaded() {
-                Log.d("Sonu", "$tempPost onAdLoaded: ")
+                Log.d("Ads", "$tempPost onAdLoaded: ")
             }
 
             override fun onAdOpened() {
