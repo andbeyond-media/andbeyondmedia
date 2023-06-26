@@ -115,7 +115,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             return
         }
         bannerConfig.apply {
-            customUnitName = String.format("/%s/%s-%s", getNetworkName(), sdkConfig?.affiliatedId.toString(), validConfig.nameType ?: "")
+            customUnitName = String.format("/%s/%s-%s", getNetworkName(), sdkConfig?.affiliatedId.toString(), getUnitNameType(validConfig.nameType ?: "", sdkConfig?.supportedSizes, adSizes))
             isNewUnit = pubAdUnit.contains(sdkConfig?.networkId ?: "")
             publisherAdUnit = pubAdUnit
             position = validConfig.position ?: 0
@@ -137,6 +137,27 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
         view.log { String.format("%s:%s", "setConfig", Gson().toJson(bannerConfig)) }
+    }
+
+    private fun getUnitNameType(type: String, supportedSizes: List<SDKConfig.Size>?, pubSizes: List<AdSize>): String {
+        if (supportedSizes.isNullOrEmpty()) return type
+        else {
+            val matchedSizes = arrayListOf<SDKConfig.Size>()
+            pubSizes.forEach { pubsize ->
+                supportedSizes.firstOrNull { (it.width?.toIntOrNull() ?: 0) == pubsize.width && (it.height?.toIntOrNull() ?: 0) == pubsize.height }?.let { matchedSize ->
+                    matchedSizes.add(matchedSize)
+                }
+            }
+            var biggestSize: SDKConfig.Size? = null
+            var maxArea = 0
+            matchedSizes.forEach {
+                if (maxArea < ((it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0))) {
+                    biggestSize = it
+                    maxArea = (it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0)
+                }
+            }
+            return biggestSize?.let { String.format("%s-%s", it.width, it.height) } ?: type
+        }
     }
 
     private fun getNetworkName(): String? {
@@ -328,16 +349,41 @@ internal class BannerManager(private val context: Context, private val bannerLis
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
             loadAd(active, unfilled)
         }
+
+        var takeOpportunity = false
         if (context.connectionAvailable() == false || (isForegroundRefresh == 0 && bannerConfig.factor < 0)) {
-            startRefreshing(timers = timers)
-        } else {
-            if (unfilled || ((bannerConfig.isVisible || (differenceOfLastRefresh >= (if (active == 1) bannerConfig.activeRefreshInterval else bannerConfig.passiveRefreshInterval) * bannerConfig.factor))
-                            && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb)))
-            ) {
-                refreshAd()
+            takeOpportunity = false
+        } else if (unfilled) {
+            takeOpportunity = true
+        } else if (active == 1) {
+            if (bannerConfig.isVisible) {
+                if (differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
+                    takeOpportunity = true
+                }
             } else {
-                startRefreshing(timers = timers)
+                if ((sdkConfig?.activeFactor ?: 0) < 0) {
+                    takeOpportunity = false
+                } else {
+                    if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= (sdkConfig?.activeFactor ?: 0) * bannerConfig.activeRefreshInterval
+                            && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
+                        takeOpportunity = true
+                    }
+                }
             }
+            if (takeOpportunity) {
+                bannerConfig.lastActiveOpportunity = currentTimeStamp
+            }
+        } else if (active == 0) {
+            if (ceil((currentTimeStamp - bannerConfig.lastPassiveOpportunity).toDouble() / 1000.00).toInt() >= bannerConfig.factor * bannerConfig.passiveRefreshInterval
+                    && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
+                takeOpportunity = true
+            }
+        }
+
+        if (takeOpportunity) {
+            refreshAd()
+        } else {
+            startRefreshing(timers = timers)
         }
     }
 
