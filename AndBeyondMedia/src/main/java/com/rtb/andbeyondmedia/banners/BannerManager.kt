@@ -216,7 +216,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
         view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
         if (bannerConfig.unFilled?.status == 1) {
-            startUnfilledRefreshCounter(sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L)
+            startUnfilledRefreshCounter()
             if (isPublisherLoad) {
                 refresh(unfilled = true)
                 return true
@@ -244,6 +244,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
+        adImpressed()
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
             overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
@@ -263,6 +264,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
             }
         }
+    }
+
+    fun adImpressed() {
+        val currentTimeStamp = Date().time
+        bannerConfig.lastRefreshAt = currentTimeStamp
     }
 
     private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false, timers: Int? = null) {
@@ -317,7 +323,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
         passiveTimeCounter?.start()
     }
 
-    private fun startUnfilledRefreshCounter(seconds: Long) {
+    private fun startUnfilledRefreshCounter() {
+        val passiveTime = sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L
+        val difference = sdkConfig?.difference?.toLong() ?: 0L
+        val seconds = if (passiveTime <= difference) difference else passiveTime
         unfilledRefreshCounter?.cancel()
         if (seconds <= 0) return
         unfilledRefreshCounter = object : CountDownTimer(seconds * 1000, 1000) {
@@ -333,54 +342,74 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun refresh(active: Int = 1, unfilled: Boolean = false) {
-        if (unfilled) {
-            view.log { "Retrying" }
-        }
         val currentTimeStamp = Date().time
-        val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
-        val timers = if (active == 0 && unfilled) {
-            null
-        } else {
-            active
-        }
-
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
             loadAd(active, unfilled)
         }
 
+        val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
+        if (unfilled) {
+            view.log { "Retrying" }
+        }
+        val timers = if (active == 0 && unfilled) {
+            null
+        } else {
+            active
+        }
         var takeOpportunity = false
-        if (context.connectionAvailable() == false || (isForegroundRefresh == 0 && bannerConfig.factor < 0)) {
-            takeOpportunity = false
-        } else if (unfilled) {
-            takeOpportunity = true
-        } else if (active == 1) {
+        if (active == 1) {
+            var pickOpportunity = false
             if (bannerConfig.isVisible) {
-                if (differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
-                    takeOpportunity = true
-                }
+                pickOpportunity = true
             } else {
-                if ((sdkConfig?.activeFactor ?: 0) < 0) {
-                    takeOpportunity = false
+                if ((sdkConfig?.visibleFactor ?: 0) < 0) {
+                    pickOpportunity = false
                 } else {
-                    if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= (sdkConfig?.activeFactor ?: 0) * bannerConfig.activeRefreshInterval
-                            && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
-                        takeOpportunity = true
+                    if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= (sdkConfig?.visibleFactor ?: 0) * bannerConfig.activeRefreshInterval) {
+                        pickOpportunity = true
                     }
                 }
             }
-            if (takeOpportunity) {
+            if (pickOpportunity) {
                 bannerConfig.lastActiveOpportunity = currentTimeStamp
+                if (differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
+                    takeOpportunity = true
+                }
             }
         } else if (active == 0) {
-            if (ceil((currentTimeStamp - bannerConfig.lastPassiveOpportunity).toDouble() / 1000.00).toInt() >= bannerConfig.factor * bannerConfig.passiveRefreshInterval
-                    && differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
-                takeOpportunity = true
+            var pickOpportunity = false
+            if (isForegroundRefresh == 1) {
+                if (bannerConfig.isVisible) {
+                    pickOpportunity = true
+                } else {
+                    if (bannerConfig.factor < 0) {
+                        pickOpportunity = false
+                    } else {
+                        if (ceil((currentTimeStamp - bannerConfig.lastPassiveOpportunity).toDouble() / 1000.00).toInt() >= bannerConfig.factor * bannerConfig.passiveRefreshInterval) {
+                            pickOpportunity = true
+                        }
+                    }
+                }
+            } else {
+                if (bannerConfig.factor < 0) {
+                    pickOpportunity = false
+                } else {
+                    if (ceil((currentTimeStamp - bannerConfig.lastPassiveOpportunity).toDouble() / 1000.00).toInt() >= bannerConfig.factor * bannerConfig.passiveRefreshInterval) {
+                        pickOpportunity = true
+                    }
+                }
+            }
+            if (pickOpportunity) {
+                bannerConfig.lastPassiveOpportunity = currentTimeStamp
+                if (differenceOfLastRefresh >= bannerConfig.difference && (bannerConfig.isVisibleFor >= (if (wasFirstLook || bannerConfig.isNewUnit) bannerConfig.minView else bannerConfig.minViewRtb))) {
+                    takeOpportunity = true
+                }
             }
         }
 
-        if (takeOpportunity) {
+        if (unfilled || (isForegroundRefresh == 1 && takeOpportunity && context.connectionAvailable() == true)) {
             refreshAd()
         } else {
             startRefreshing(timers = timers)

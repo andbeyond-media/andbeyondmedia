@@ -2,7 +2,6 @@ package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
-import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 @Keep
 internal data class SDKConfig(
@@ -35,7 +34,7 @@ internal data class SDKConfig(
         @SerializedName("factor")
         val factor: Int? = null,
         @SerializedName("active_factor")
-        val activeFactor: Int? = null,
+        val visibleFactor: Int? = null,
         @SerializedName("min_view")
         val minView: Int? = null,
         @SerializedName("min_view_rtb")
