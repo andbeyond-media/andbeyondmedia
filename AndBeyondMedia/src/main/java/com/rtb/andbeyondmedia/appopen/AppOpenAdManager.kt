@@ -55,7 +55,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                         loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest, adLoadCallback)
                     }
                 } else if (appOpenConfig.hijack?.status == 1) {
-                    createRequest().getAdRequest()?.let { request ->
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = true, newUnit = false), adManagerAdRequest, adLoadCallback)
                     }
@@ -99,7 +99,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
 
     private fun adFailedToLoad(context: Context, firstLook: Boolean, adLoadCallback: AdLoadCallback?) {
         fun requestAd() {
-            createRequest().getAdRequest()?.let {
+            createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(context, getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, adLoadCallback)
             }
         }
@@ -192,9 +192,11 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         return overridingUnit ?: String.format("%s-%d", appOpenConfig.customUnitName, if (unfilled) appOpenConfig.unFilled?.number else if (newUnit) appOpenConfig.newUnit?.number else if (hijacked) appOpenConfig.hijack?.number else appOpenConfig.position)
     }
 
-    private fun createRequest() = AdRequest().Builder().apply {
+    private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", loadingAdUnit ?: "")
         addCustomTargeting("hb_format", "amp")
+        if (unfilled) addCustomTargeting("retry", "1")
+        if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
     private fun wasLoadTimeLessThanNHoursAgo(numHours: Long): Boolean {
