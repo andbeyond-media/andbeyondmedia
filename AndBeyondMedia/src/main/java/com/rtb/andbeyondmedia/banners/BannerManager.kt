@@ -416,14 +416,15 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    private fun createRequest(active: Int, unfilled: Boolean = false) = AdRequest().Builder().apply {
+    private fun createRequest(active: Int, unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
         addCustomTargeting("hb_format", "amp")
         addCustomTargeting("visible", isForegroundRefresh.toString())
         addCustomTargeting("min_view", (if (bannerConfig.isVisibleFor > 10) 10 else bannerConfig.isVisibleFor).toString())
-        addCustomTargeting("retry", (if (unfilled) 1 else 0).toString())
+        if (unfilled) addCustomTargeting("retry", "1")
+        if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
     private fun loadAd(active: Int, unfilled: Boolean) {
@@ -443,7 +444,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } else if (bannerConfig.hijack?.status == 1) {
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes)
             view.log { "checkOverride: hijack" }
-            return createRequest(1).getAdRequest()
+            return createRequest(1, hijacked = true).getAdRequest()
         }
         return null
     }

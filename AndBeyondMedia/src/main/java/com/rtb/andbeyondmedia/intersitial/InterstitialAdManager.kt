@@ -54,7 +54,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
                 } else if (interstitialConfig.hijack?.status == 1) {
-                    createRequest().getAdRequest()?.let { request ->
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
                     }
@@ -117,7 +117,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
         fun requestAd() {
-            createRequest().getAdRequest()?.let {
+            createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
             }
         }
@@ -200,9 +200,11 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         return overridingUnit ?: String.format("%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
     }
 
-    private fun createRequest() = AdRequest().Builder().apply {
+    private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", adUnit)
         addCustomTargeting("hb_format", "amp")
+        if (unfilled) addCustomTargeting("retry", "1")
+        if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {

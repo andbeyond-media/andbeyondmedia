@@ -55,7 +55,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
                 } else if (config.hijack?.status == 1) {
-                    createRequest().getAdRequest()?.let { request ->
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
                     }
@@ -118,7 +118,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (rewardedAd: RewardedAd?) -> Unit) {
         fun requestAd() {
-            createRequest().getAdRequest()?.let {
+            createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
             }
         }
@@ -201,9 +201,11 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
         return overridingUnit ?: String.format("%s-%d", config.customUnitName, if (unfilled) config.unFilled?.number else if (newUnit) config.newUnit?.number else if (hijacked) config.hijack?.number else config.position)
     }
 
-    private fun createRequest() = AdRequest().Builder().apply {
+    private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", adUnit)
         addCustomTargeting("hb_format", "video")
+        if (unfilled) addCustomTargeting("retry", "1")
+        if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
