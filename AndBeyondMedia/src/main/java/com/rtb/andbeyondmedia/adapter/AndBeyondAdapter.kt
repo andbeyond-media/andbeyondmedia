@@ -17,6 +17,7 @@ class AndBeyondAdapter : Adapter() {
     private lateinit var rewardedLoaded: RewardedLoader
     private lateinit var rewardedInterstitialLoader: RewardedInterstitialLoader
     private lateinit var appOpenAdLoader: AppOpenAdLoader
+    private lateinit var nativeAdLoaded: NativeAdLoader
     private val TAG: String = this::class.java.simpleName
 
     companion object {
@@ -78,5 +79,11 @@ class AndBeyondAdapter : Adapter() {
         Logger.INFO.log(TAG, "loadRewardedInterstitialAd:")
         rewardedInterstitialLoader = RewardedInterstitialLoader(mediationRewardedAdConfiguration, callback)
         rewardedInterstitialLoader.loadAd()
+    }
+
+    override fun loadNativeAd(mediationNativeAdConfiguration: MediationNativeAdConfiguration, callback: MediationAdLoadCallback<UnifiedNativeAdMapper, MediationNativeAdCallback>) {
+        Logger.INFO.log(TAG, "loadNativeAd:")
+        nativeAdLoaded = NativeAdLoader(mediationNativeAdConfiguration, callback)
+        nativeAdLoaded.loadAd()
     }
 }
