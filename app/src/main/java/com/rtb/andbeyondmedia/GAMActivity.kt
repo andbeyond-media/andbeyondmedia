@@ -20,10 +20,10 @@ class GAMActivity : AppCompatActivity() {
 
     private fun init() {
         //  MobileAds.initialize(this) {}
-        NativeAdManager(this, "aa").testLoad(AdRequest().Builder().build()) {
+        NativeAdManager(this, "/21952429235/985111-NATIVE-1").testLoad(AdRequest().Builder().build()) {
             Log.d("Sonu", "init: ${it.getHeadline()}")
         }
-        // binding.mediaView.test()
+        //binding.mediaView.setMediaContent(NativeMediaContent())
     }
 
     private fun loadAd() {

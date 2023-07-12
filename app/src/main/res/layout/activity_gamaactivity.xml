@@ -24,10 +24,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
-            <com.rtb.andbeyondmedia.native.MediaViewTest
+          <!--  <com.rtb.andbeyondmedia.native.NativeMediaView
                 android:id="@+id/media_view"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content" />-->
 
         </LinearLayout>
 

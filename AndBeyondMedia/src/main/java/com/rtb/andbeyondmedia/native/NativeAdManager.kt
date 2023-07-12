@@ -46,9 +46,10 @@ class NativeAdManager(private val context: Activity, private val adUnit: String)
     }
 
     fun testLoad(adRequest: AdRequest, callBack: (nativeAd: NativeAdTest) -> Unit) {
-        val adLoader = AdLoader.Builder(context, "/6499/example/native")
+        val adLoader = AdLoader.Builder(context, "/21952429235/985111-NATIVE-1")
                 .forNativeAd { ad: NativeAd ->
                     // Show the ad.
+                    Log.d("Sonu", "testLoad: ${ad.responseInfo.toString()}")
                     callBack(NativeAdTest(ad))
                 }
                 .withAdListener(object : AdListener() {
