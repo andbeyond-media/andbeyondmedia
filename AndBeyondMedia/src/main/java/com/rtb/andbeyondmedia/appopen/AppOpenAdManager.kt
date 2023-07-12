@@ -49,7 +49,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (appOpenConfig.isNewUnit) {
+                if (appOpenConfig.isNewUnit && appOpenConfig.newUnit?.status == 1) {
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest, adLoadCallback)

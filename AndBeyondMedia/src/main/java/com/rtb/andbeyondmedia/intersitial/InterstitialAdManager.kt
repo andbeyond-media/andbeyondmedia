@@ -48,7 +48,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (interstitialConfig.isNewUnit) {
+                if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)

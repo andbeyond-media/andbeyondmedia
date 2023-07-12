@@ -51,7 +51,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (config.isNewUnit) {
+                if (config.isNewUnit && config.newUnit?.status == 1) {
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
