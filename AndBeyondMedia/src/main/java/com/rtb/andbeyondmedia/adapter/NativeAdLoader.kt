@@ -18,7 +18,6 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.ErrorCode
 import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.log
-import java.text.NumberFormat
 
 class NativeAdLoader(private val mediationNativeAdConfiguration: MediationNativeAdConfiguration,
                      private val mediationAdLoadCallback: MediationAdLoadCallback<UnifiedNativeAdMapper, MediationNativeAdCallback>)
@@ -78,12 +77,7 @@ class NativeAdLoader(private val mediationNativeAdConfiguration: MediationNative
                 }
             }
             images = imagesList
-
-            if (nativeAd.price != null) {
-                val formatter = NumberFormat.getCurrencyInstance()
-                val priceString: String = formatter.format(nativeAd.price)
-                price = priceString
-            }
+            price = nativeAd.price ?: ""
             overrideClickHandling = false
             overrideImpressionRecording = false
             advertiser = nativeAd.advertiser ?: ""
