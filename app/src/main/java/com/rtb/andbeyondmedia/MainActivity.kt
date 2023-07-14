@@ -58,14 +58,14 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     }
 
     private fun loadNative() {
-        val nativeAdManger = NativeAdManager(this, "/21952429235/985111-NATIVE-1")
+        val nativeAdManger = NativeAdManager(this, "/6499/example/native")
         nativeAdManger.setAdListener(object : AdListener() {
             override fun onAdLoaded() {
-                Log.d("Sonu", "native ad loaded ")
+                // Native Ad loaded
             }
 
             override fun onAdFailedToLoad(p0: LoadAdError) {
-                Log.d("Sonu", "Native ad failed: $p0")
+                // Native Ad failed to load
             }
         })
         nativeAdManger.load(AdRequest().Builder().build()) {
@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
                 binding.description.text = it.body
                 binding.nativeAd.bodyView = binding.description
                 binding.nativeAd.setNativeAd(it)
-            } ?: Log.d("Sonu", "loadNative: did not load")
+            }
         }
     }
 

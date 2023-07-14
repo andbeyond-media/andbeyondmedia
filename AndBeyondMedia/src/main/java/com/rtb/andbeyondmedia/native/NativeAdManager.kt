@@ -270,7 +270,7 @@ class NativeAdManager(private val context: Activity, private val adUnit: String)
 
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
-        if ((!otherUnit && sdkConfig?.prebid?.firstLook == 0) || (otherUnit && sdkConfig?.prebid?.other == 0)) {
+        if ((!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)) {
             val adUnit = NativeAdUnit((if (otherUnit) nativeConfig.placement?.other ?: 0 else nativeConfig.placement?.firstLook ?: 0).toString())
             adUnit.setContextType(NativeAdUnit.CONTEXT_TYPE.SOCIAL_CENTRIC)
             adUnit.setPlacementType(NativeAdUnit.PLACEMENTTYPE.CONTENT_FEED)
