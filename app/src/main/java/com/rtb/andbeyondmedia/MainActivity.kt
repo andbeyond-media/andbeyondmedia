@@ -4,12 +4,15 @@ import android.os.Bundle
 import android.util.DisplayMetrics
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.LoadAdError
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.databinding.ActivityMainBinding
 import com.rtb.andbeyondmedia.intersitial.InterstitialAd
+import com.rtb.andbeyondmedia.native.NativeAdManager
 import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
@@ -25,11 +28,12 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
-        loadAd()
+        //loadAd()
         //loadInterstitial()
         //loadInterstitialRewarded()
         //loadRewarded()
         //loadAdaptiveAd()
+        loadNative()
     }
 
     private fun init() {
@@ -51,6 +55,28 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
         binding.bannerAd.setAdListener(this)
+    }
+
+    private fun loadNative() {
+        val nativeAdManger = NativeAdManager(this, "/21952429235/985111-NATIVE-1")
+        nativeAdManger.setAdListener(object : AdListener() {
+            override fun onAdLoaded() {
+                Log.d("Sonu", "native ad loaded ")
+            }
+
+            override fun onAdFailedToLoad(p0: LoadAdError) {
+                Log.d("Sonu", "Native ad failed: $p0")
+            }
+        })
+        nativeAdManger.load(AdRequest().Builder().build()) {
+            it?.let {
+                binding.title.text = it.headline
+                binding.nativeAd.headlineView = binding.title
+                binding.description.text = it.body
+                binding.nativeAd.bodyView = binding.description
+                binding.nativeAd.setNativeAd(it)
+            } ?: Log.d("Sonu", "loadNative: did not load")
+        }
     }
 
 
