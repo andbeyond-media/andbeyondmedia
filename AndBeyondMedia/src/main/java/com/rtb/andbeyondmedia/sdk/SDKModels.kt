@@ -134,6 +134,8 @@ internal data class SDKConfig(
             val type: String? = null,
             @SerializedName("name_type")
             val nameType: String? = null,
+            @SerializedName("format")
+            val format: String? = null,
             @SerializedName("sizes")
             val sizes: List<Size>? = null,
             @SerializedName("follow")

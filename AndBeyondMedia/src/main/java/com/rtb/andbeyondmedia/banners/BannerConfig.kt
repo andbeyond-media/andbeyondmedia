@@ -49,5 +49,7 @@ internal data class BannerConfig(
         @SerializedName("lastRefreshAt")
         var lastRefreshAt: Long = Date().time,
         var lastActiveOpportunity: Long = Date().time,
-        var lastPassiveOpportunity: Long = Date().time
+        var lastPassiveOpportunity: Long = Date().time,
+        @SerializedName("format")
+        var format: String? = null
 )

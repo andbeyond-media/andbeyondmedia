@@ -23,6 +23,10 @@ import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.InterstitialAdUnit
+import org.prebid.mobile.Signals
+import org.prebid.mobile.VideoParameters
+import org.prebid.mobile.api.data.AdUnitFormat
+import java.util.EnumSet
 
 internal class InterstitialAdManager(private val context: Activity, private val adUnit: String) {
 
@@ -193,6 +197,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
             hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
+            format = validConfig.format
         }
     }
 
@@ -209,10 +214,35 @@ internal class InterstitialAdManager(private val context: Activity, private val 
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
         if ((!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)) {
-            val adUnit = InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), 50, 70)
+            val formatNeeded = interstitialConfig.format
+            val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
+                InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), 80, 60)
+            } else if (formatNeeded.contains("video", true) && !formatNeeded.contains("html", true)) {
+                InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), EnumSet.of(AdUnitFormat.VIDEO)).apply {
+                    videoParameters = configureVideoParameters()
+                }
+            } else {
+                InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), EnumSet.of(AdUnitFormat.VIDEO, AdUnitFormat.VIDEO)).apply {
+                    setMinSizePercentage(80, 60)
+                    videoParameters = configureVideoParameters()
+                }
+            }
             adUnit.fetchDemand(adRequest) { callback() }
         } else {
             callback()
+        }
+    }
+
+    private fun configureVideoParameters(): VideoParameters {
+        return VideoParameters(listOf("video/x-flv", "video/mp4")).apply {
+            placement = Signals.Placement.Interstitial
+            api = listOf(Signals.Api.VPAID_1, Signals.Api.VPAID_2)
+            maxBitrate = 1500
+            minBitrate = 300
+            maxDuration = 30
+            minDuration = 5
+            playbackMethod = listOf(Signals.PlaybackMethod.AutoPlaySoundOn)
+            protocols = listOf(Signals.Protocols.VAST_2_0)
         }
     }
 }

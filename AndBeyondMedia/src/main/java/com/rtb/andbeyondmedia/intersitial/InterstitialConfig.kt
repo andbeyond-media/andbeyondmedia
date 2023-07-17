@@ -22,4 +22,6 @@ internal data class InterstitialConfig(
         var unFilled: SDKConfig.LoadConfig? = null,
         @SerializedName("placement")
         var placement: SDKConfig.Placement? = null,
+        @SerializedName("format")
+        var format: String? = null
 )

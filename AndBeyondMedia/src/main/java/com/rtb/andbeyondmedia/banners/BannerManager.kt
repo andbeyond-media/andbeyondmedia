@@ -20,7 +20,11 @@ import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.BannerAdUnit
+import org.prebid.mobile.Signals
+import org.prebid.mobile.VideoParameters
+import org.prebid.mobile.api.data.AdUnitFormat
 import java.util.Date
+import java.util.EnumSet
 import kotlin.math.ceil
 
 internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener, private val view: View? = null) {
@@ -130,6 +134,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             factor = sdkConfig?.factor ?: 0
             minView = sdkConfig?.minView ?: 0
             minViewRtb = sdkConfig?.minViewRtb ?: 0
+            format = validConfig.format
             this.adSizes = if (validConfig.follow == 1 && !validConfig.sizes.isNullOrEmpty()) {
                 getCustomSizes(adSizes, validConfig.sizes)
             } else {
@@ -464,7 +469,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (bannerConfig.adSizes.isNotEmpty()) {
                     val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
                     val firstAdSize = totalSizes[0]
-                    val adUnit = BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height)
+                    val formatNeeded = bannerConfig.format
+                    val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
+                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height)
+                    } else if (formatNeeded.contains("video", true) && !formatNeeded.contains("html", true)) {
+                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO)).apply {
+                            videoParameters = configureVideoParameters()
+                        }
+                    } else {
+                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO, AdUnitFormat.BANNER)).apply {
+                            videoParameters = configureVideoParameters()
+                        }
+                    }
                     totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
                     adUnit.fetchDemand(adRequest) { callback() }
                 }
@@ -475,6 +491,19 @@ internal class BannerManager(private val context: Context, private val bannerLis
             callback()
         }
     }
+
+    private fun configureVideoParameters(): VideoParameters {
+        return VideoParameters(listOf("video/x-flv", "video/mp4")).apply {
+            api = listOf(Signals.Api.VPAID_1, Signals.Api.VPAID_2)
+            maxBitrate = 1500
+            minBitrate = 300
+            maxDuration = 30
+            minDuration = 5
+            playbackMethod = listOf(Signals.PlaybackMethod.AutoPlaySoundOn)
+            protocols = listOf(Signals.Protocols.VAST_2_0)
+        }
+    }
+
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
         return overridingUnit ?: String.format("%s-%d", bannerConfig.customUnitName,
