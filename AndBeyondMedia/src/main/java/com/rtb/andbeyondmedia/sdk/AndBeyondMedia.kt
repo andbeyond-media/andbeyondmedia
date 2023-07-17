@@ -30,7 +30,7 @@ object AndBeyondMedia {
     internal var specialTag: String? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
-        this.logEnabled = logsEnabled
+            this.logEnabled = logsEnabled
         fetchConfig(context)
     }
 
@@ -136,10 +136,8 @@ internal object SDKManager {
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
         PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
         PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
-        prebid?.schain?.let {
-            TargetingParams.setUserExt(Ext().apply {
-                put("schain", it)
-            })
+        prebid?.sChainInfo?.let {
+            TargetingParams.setUserExt(Ext().apply { put(it.key ?: "", it.value ?: "") })
         }
     }
 

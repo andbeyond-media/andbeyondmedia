@@ -102,9 +102,17 @@ internal data class SDKConfig(
             val timeout: String? = null,
             @SerializedName("debug")
             val debug: Int = 0,
-            @SerializedName("schain")
-            val schain: String? = null
-    )
+            @SerializedName("schain_info")
+            val sChainInfo: SChainInfo? = null
+    ) {
+        @Keep
+        data class SChainInfo(
+                @SerializedName("key")
+                val key: String? = null,
+                @SerializedName("value")
+                val value: String? = null
+        )
+    }
 
     @Keep
     data class GeoEdge(
