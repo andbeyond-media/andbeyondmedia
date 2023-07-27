@@ -131,7 +131,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             difference = sdkConfig?.difference ?: 0
             activeRefreshInterval = sdkConfig?.activeRefreshInterval ?: 0
             passiveRefreshInterval = sdkConfig?.passiveRefreshInterval ?: 0
-            factor = sdkConfig?.factor ?: 0
+            factor = sdkConfig?.factor ?: 1
             minView = sdkConfig?.minView ?: 0
             minViewRtb = sdkConfig?.minViewRtb ?: 0
             format = validConfig.format
@@ -369,7 +369,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             if (bannerConfig.isVisible) {
                 pickOpportunity = true
             } else {
-                if ((sdkConfig?.visibleFactor ?: 0) < 0) {
+                if ((sdkConfig?.visibleFactor ?: 1) < 0) {
                     pickOpportunity = false
                 } else {
                     if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= (sdkConfig?.visibleFactor ?: 0) * bannerConfig.activeRefreshInterval) {

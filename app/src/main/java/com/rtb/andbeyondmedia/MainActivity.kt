@@ -3,6 +3,7 @@ package com.rtb.andbeyondmedia
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.util.Log
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.LoadAdError
@@ -28,12 +29,12 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
-        //loadAd()
+        loadAd()
         //loadInterstitial()
         //loadInterstitialRewarded()
         //loadRewarded()
         //loadAdaptiveAd()
-        loadNative()
+        //loadNative()
     }
 
     private fun init() {
@@ -74,6 +75,12 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
                 binding.nativeAd.headlineView = binding.title
                 binding.description.text = it.body
                 binding.nativeAd.bodyView = binding.description
+                binding.icon.setImageURI(it.icon?.uri)
+                binding.icon.setImageDrawable(it.icon?.drawable)
+                binding.mediaView.mediaContent = it.mediaContent
+                binding.mediaView.setImageScaleType(ImageView.ScaleType.CENTER_CROP)
+                binding.nativeAd.iconView = binding.icon
+                binding.nativeAd.mediaView = binding.mediaView
                 binding.nativeAd.setNativeAd(it)
             }
         }
@@ -81,7 +88,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
 
 
     private fun loadInterstitial() {
-        interstitialAd = InterstitialAd(this, "/21952429235,22885371519/695202-INTERSTITIAL-1")
+        interstitialAd = InterstitialAd(this, "/6499/example/interstitial")
         interstitialAd?.load(AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()) {
             binding.showInterstitial.isEnabled = it
         }
