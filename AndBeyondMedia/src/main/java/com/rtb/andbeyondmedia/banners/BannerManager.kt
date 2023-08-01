@@ -11,12 +11,15 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdapterResponseInfo
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.gson.Gson
+import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.connectionAvailable
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.CountryDetectionWorker
+import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.BannerAdUnit
@@ -40,10 +43,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
     private var refreshBlocked = false
+    private var adType: String = ""
+    private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
+    private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
 
     init {
         sdkConfig = storeService.config
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        getCountryConfig()
     }
 
     private fun shouldBeActive() = shouldBeActive
@@ -82,6 +89,28 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
+    private fun getCountryConfig() {
+        val workManager = AndBeyondMedia.getWorkManager(context)
+        val workers = workManager.getWorkInfosForUniqueWork(CountryDetectionWorker::class.java.simpleName).get()
+        if (workers.isNullOrEmpty()) {
+            return
+        }
+        try {
+            val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
+            workerData?.observeForever(object : Observer<WorkInfo> {
+                override fun onChanged(value: WorkInfo) {
+                    if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
+                        workerData.removeObserver(this)
+                        countrySetup = Triple(true, false, storeService.detectedCountry)
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            e.message
+        }
+    }
+
+    @Suppress("UNNECESSARY_SAFE_CALL")
     fun shouldSetConfig(callback: (Boolean) -> Unit) {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
@@ -107,7 +136,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String) {
-        view.log { String.format("%s:%s", "setConfig", "entry") }
+        view.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive()) return
         if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it) } == true) {
             shouldBeActive = false
@@ -118,6 +147,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
             shouldBeActive = false
             return
         }
+        this.adType = adType
+        this.pubAdSizes = adSizes
         bannerConfig.apply {
             customUnitName = String.format("/%s/%s-%s", getNetworkName(), sdkConfig?.affiliatedId.toString(), getUnitNameType(validConfig.nameType ?: "", sdkConfig?.supportedSizes, adSizes))
             isNewUnit = pubAdUnit.contains(sdkConfig?.networkId ?: "")
@@ -126,12 +157,13 @@ internal class BannerManager(private val context: Context, private val bannerLis
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
             retryConfig = sdkConfig?.retryConfig?.also { it.fillAdUnits() }
-            hijack = getValidLoadConfig(adType, true)
-            unFilled = getValidLoadConfig(adType, false)
+            hijack = getValidLoadConfig(adType, true, sdkConfig?.hijackConfig, sdkConfig?.unfilledConfig)
+            unFilled = getValidLoadConfig(adType, false, sdkConfig?.hijackConfig, sdkConfig?.unfilledConfig)
             difference = sdkConfig?.difference ?: 0
             activeRefreshInterval = sdkConfig?.activeRefreshInterval ?: 0
             passiveRefreshInterval = sdkConfig?.passiveRefreshInterval ?: 0
             factor = sdkConfig?.factor ?: 1
+            visibleFactor = sdkConfig?.visibleFactor ?: 1
             minView = sdkConfig?.minView ?: 0
             minViewRtb = sdkConfig?.minViewRtb ?: 0
             format = validConfig.format
@@ -142,6 +174,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
         view.log { String.format("%s:%s", "setConfig", Gson().toJson(bannerConfig)) }
+        setCountryConfig()
     }
 
     private fun getUnitNameType(type: String, supportedSizes: List<SDKConfig.Size>?, pubSizes: List<AdSize>): String {
@@ -169,17 +202,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return if (sdkConfig?.networkCode.isNullOrEmpty()) sdkConfig?.networkId else String.format("%s,%s", sdkConfig?.networkId, sdkConfig?.networkCode)
     }
 
-    private fun getValidLoadConfig(adType: String, forHijack: Boolean): SDKConfig.LoadConfig? {
+    private fun getValidLoadConfig(adType: String, forHijack: Boolean, hijackConfig: SDKConfig.LoadConfigs?, unfilledConfig: SDKConfig.LoadConfigs?): SDKConfig.LoadConfig? {
         var validConfig = when {
-            adType.equals(AdTypes.BANNER, true) -> if (forHijack) sdkConfig?.hijackConfig?.banner else sdkConfig?.unfilledConfig?.banner
-            adType.equals(AdTypes.INLINE, true) -> if (forHijack) sdkConfig?.hijackConfig?.inline else sdkConfig?.unfilledConfig?.inline
-            adType.equals(AdTypes.ADAPTIVE, true) -> if (forHijack) sdkConfig?.hijackConfig?.adaptive else sdkConfig?.unfilledConfig?.adaptive
-            adType.equals(AdTypes.INREAD, true) -> if (forHijack) sdkConfig?.hijackConfig?.inread else sdkConfig?.unfilledConfig?.inread
-            adType.equals(AdTypes.STICKY, true) -> if (forHijack) sdkConfig?.hijackConfig?.sticky else sdkConfig?.unfilledConfig?.sticky
-            else -> if (forHijack) sdkConfig?.hijackConfig?.other else sdkConfig?.unfilledConfig?.other
+            adType.equals(AdTypes.BANNER, true) -> if (forHijack) hijackConfig?.banner else unfilledConfig?.banner
+            adType.equals(AdTypes.INLINE, true) -> if (forHijack) hijackConfig?.inline else unfilledConfig?.inline
+            adType.equals(AdTypes.ADAPTIVE, true) -> if (forHijack) hijackConfig?.adaptive else unfilledConfig?.adaptive
+            adType.equals(AdTypes.INREAD, true) -> if (forHijack) hijackConfig?.inread else unfilledConfig?.inread
+            adType.equals(AdTypes.STICKY, true) -> if (forHijack) hijackConfig?.sticky else unfilledConfig?.sticky
+            else -> if (forHijack) hijackConfig?.other else unfilledConfig?.other
         }
         if (validConfig == null) {
-            validConfig = if (forHijack) sdkConfig?.hijackConfig?.other else sdkConfig?.unfilledConfig?.other
+            validConfig = if (forHijack) hijackConfig?.other else unfilledConfig?.other
         }
         return validConfig
     }
@@ -200,6 +233,42 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return sizes
     }
 
+    private fun setCountryConfig() {
+        if (!countrySetup.first || countrySetup.second || countrySetup.third == null || countrySetup.third?.countryCode.isNullOrEmpty() || sdkConfig?.homeCountry?.contains(countrySetup.third?.countryCode ?: "IN", true) == true) return
+        bannerConfig = bannerConfig.apply {
+            val currentCountry = countrySetup.third?.countryCode ?: "IN"
+            val validCountryConfig = sdkConfig?.countryConfigs?.firstOrNull { config -> config.name?.contains(currentCountry, true) == true || config.name?.contains("other") == true }
+                    ?: return@apply
+            val validRefreshConfig = validCountryConfig.refreshConfig?.firstOrNull { config ->
+                config.specific?.equals(this.publisherAdUnit, true) == true
+                        || config.type == adType || config.type.equals("all", true)
+            }
+            validRefreshConfig?.let {
+                customUnitName = String.format("/%s/%s-%s", getNetworkName(), sdkConfig?.affiliatedId.toString(), getUnitNameType(it.nameType ?: "", validCountryConfig.supportedSizes, pubAdSizes))
+                position = it.position ?: 0
+                placement = it.placement
+                format = it.format
+                this.adSizes = if (it.follow == 1 && !it.sizes.isNullOrEmpty()) {
+                    getCustomSizes(pubAdSizes, it.sizes)
+                } else {
+                    pubAdSizes
+                }
+            }
+            validCountryConfig.hijackConfig?.newUnit?.let { newUnit = it }
+            validCountryConfig.hijackConfig?.let { hijack = getValidLoadConfig(adType, true, it, null) }
+            validCountryConfig.unfilledConfig?.let { unFilled = getValidLoadConfig(adType, false, null, it) }
+            validCountryConfig.diff?.let { difference = it }
+            validCountryConfig.activeRefreshInterval?.let { activeRefreshInterval = it }
+            validCountryConfig.passiveRefreshInterval?.let { passiveRefreshInterval = it }
+            validCountryConfig.factor?.let { factor = it }
+            validCountryConfig.visibleFactor?.let { visibleFactor = it }
+            validCountryConfig.minView?.let { minView = it }
+            validCountryConfig.minViewRtb?.let { minViewRtb = it }
+        }
+        countrySetup = Triple(countrySetup.first, true, countrySetup.third)
+        view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
+    }
+
     fun saveVisibility(visible: Boolean) {
         if (visible == bannerConfig.isVisible) return
         bannerConfig.isVisible = visible
@@ -218,6 +287,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adFailedToLoad(isPublisherLoad: Boolean): Boolean {
+        setCountryConfig()
         view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
         view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
         if (bannerConfig.unFilled?.status == 1) {
@@ -250,6 +320,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
         adImpressed()
+        setCountryConfig()
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
             overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
@@ -369,10 +440,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
             if (bannerConfig.isVisible) {
                 pickOpportunity = true
             } else {
-                if ((sdkConfig?.visibleFactor ?: 1) < 0) {
+                if (bannerConfig.visibleFactor < 0) {
                     pickOpportunity = false
                 } else {
-                    if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= (sdkConfig?.visibleFactor ?: 0) * bannerConfig.activeRefreshInterval) {
+                    if (ceil((currentTimeStamp - bannerConfig.lastActiveOpportunity).toDouble() / 1000.00).toInt() >= bannerConfig.visibleFactor * bannerConfig.activeRefreshInterval) {
                         pickOpportunity = true
                     }
                 }

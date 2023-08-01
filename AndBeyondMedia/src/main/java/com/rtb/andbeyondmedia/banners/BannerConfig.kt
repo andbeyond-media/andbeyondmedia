@@ -36,6 +36,8 @@ internal data class BannerConfig(
         var passiveRefreshInterval: Int = 0,
         @SerializedName("factor")
         var factor: Int = 1,
+        @SerializedName("active_factor")
+        var visibleFactor: Int = 1,
         @SerializedName("minView")
         var minView: Int = 0,
         @SerializedName("minViewRtb")

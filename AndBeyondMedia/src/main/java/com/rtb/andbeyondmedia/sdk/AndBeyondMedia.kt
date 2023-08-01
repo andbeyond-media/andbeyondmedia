@@ -10,6 +10,7 @@ import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListene
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
+import com.rtb.andbeyondmedia.common.URLs.COUNTRY_DETECTION_URL
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -25,13 +26,15 @@ import java.util.concurrent.TimeUnit
 object AndBeyondMedia {
     private var storeService: StoreService? = null
     private var configService: ConfigService? = null
+    private var countryService: CountryService? = null
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
-            this.logEnabled = logsEnabled
+        this.logEnabled = logsEnabled
         fetchConfig(context)
+        fetchCountry(context)
     }
 
     internal fun getStoreService(context: Context): StoreService {
@@ -53,6 +56,19 @@ object AndBeyondMedia {
                     .addConverterFactory(GsonConverterFactory.create()).build().create(ConfigService::class.java)
         }
         return configService as ConfigService
+    }
+
+    internal fun getCountryService(): CountryService {
+        @Synchronized
+        if (countryService == null) {
+            val client = OkHttpClient.Builder()
+                    .connectTimeout(3, TimeUnit.SECONDS)
+                    .writeTimeout(3, TimeUnit.SECONDS)
+                    .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
+            countryService = Retrofit.Builder().baseUrl(COUNTRY_DETECTION_URL).client(client)
+                    .addConverterFactory(GsonConverterFactory.create()).build().create(CountryService::class.java)
+        }
+        return countryService as CountryService
     }
 
     internal fun getWorkManager(context: Context): WorkManager {
@@ -94,6 +110,18 @@ object AndBeyondMedia {
             SDKManager.initialize(context)
         }
     }
+
+    private fun fetchCountry(context: Context) {
+        try {
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<CountryDetectionWorker>().setConstraints(constraints).build()
+            val workName: String = CountryDetectionWorker::class.java.simpleName
+            val workManager = getWorkManager(context)
+            workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
+        } catch (e: Throwable) {
+
+        }
+    }
 }
 
 internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -115,6 +143,25 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
             storeService.config?.let {
                 Result.success()
             } ?: Result.failure()
+        }
+    }
+}
+
+internal class CountryDetectionWorker(private val context: Context, params: WorkerParameters) : Worker(context, params) {
+    override fun doWork(): Result {
+        val storeService = AndBeyondMedia.getStoreService(context)
+        return try {
+            val countryService = AndBeyondMedia.getCountryService()
+            val response = countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode")).execute()
+            if (response.isSuccessful && response.body() != null) {
+                storeService.detectedCountry = response.body()
+                Result.success()
+            } else {
+                Result.failure()
+            }
+        } catch (e: Exception) {
+            Logger.ERROR.log(msg = e.message ?: "")
+            Result.failure()
         }
     }
 }
@@ -168,6 +215,11 @@ internal interface ConfigService {
     fun getConfig(@QueryMap params: HashMap<String, Any>): Call<SDKConfig>
 }
 
+internal interface CountryService {
+    @GET("check")
+    fun getConfig(@QueryMap params: HashMap<String, Any>): Call<CountryModel>
+}
+
 internal class StoreService(private val prefs: SharedPreferences) {
 
     var config: SDKConfig?
@@ -178,5 +230,15 @@ internal class StoreService(private val prefs: SharedPreferences) {
         }
         set(value) = prefs.edit().apply {
             value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
+        }.apply()
+
+    var detectedCountry: CountryModel?
+        get() {
+            val string = prefs.getString("COUNTRY", "") ?: ""
+            if (string.isEmpty()) return null
+            return Gson().fromJson(string, CountryModel::class.java)
+        }
+        set(value) = prefs.edit().apply {
+            value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
         }.apply()
 }
