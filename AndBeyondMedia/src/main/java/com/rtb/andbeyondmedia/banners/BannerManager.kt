@@ -284,6 +284,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 refreshBlocked = true
             }
         }
+        if (refreshBlocked) {
+            activeTimeCounter?.cancel()
+            passiveTimeCounter?.cancel()
+            unfilledRefreshCounter?.cancel()
+        }
     }
 
     fun adFailedToLoad(isPublisherLoad: Boolean): Boolean {

@@ -183,8 +183,30 @@ internal object SDKManager {
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
         PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
         PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
-        prebid?.sChainInfo?.let {
-            TargetingParams.setUserExt(Ext().apply { put(it.key ?: "", it.value ?: "") })
+        PrebidMobile.setShareGeoLocation(prebid?.location == null || prebid.location == 1)
+        prebid?.gdpr?.let { TargetingParams.setSubjectToGDPR(it == 1) }
+        if (prebid?.gdprConsentString.isNullOrEmpty()) {
+            TargetingParams.setGDPRConsentString(prebid?.gdprConsentString)
+        }
+        if (prebid?.bundleName.isNullOrEmpty()) {
+            TargetingParams.setBundleName(prebid?.bundleName)
+        }
+        if (prebid?.domain.isNullOrEmpty()) {
+            TargetingParams.setDomain(prebid?.domain)
+        }
+        if (prebid?.storeURL.isNullOrEmpty()) {
+            TargetingParams.setStoreUrl(prebid?.storeURL)
+        }
+        if (prebid?.omidPartnerName.isNullOrEmpty()) {
+            TargetingParams.setOmidPartnerName(prebid?.omidPartnerName)
+        }
+        if (prebid?.omidPartnerVersion.isNullOrEmpty()) {
+            TargetingParams.setOmidPartnerVersion(prebid?.omidPartnerVersion)
+        }
+        if (!prebid?.extParams.isNullOrEmpty()) {
+            TargetingParams.setUserExt(Ext().apply {
+                prebid?.extParams?.forEach { put(it.key ?: "", it.value ?: "") }
+            })
         }
     }
 

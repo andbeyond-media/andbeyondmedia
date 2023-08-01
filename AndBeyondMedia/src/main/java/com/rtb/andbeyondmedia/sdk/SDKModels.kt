@@ -106,11 +106,27 @@ internal data class SDKConfig(
             val timeout: String? = null,
             @SerializedName("debug")
             val debug: Int = 0,
-            @SerializedName("schain_info")
-            val sChainInfo: SChainInfo? = null
+            @SerializedName("location")
+            val location: Int? = null,
+            @SerializedName("gdpr")
+            val gdpr: Int? = null,
+            @SerializedName("bundle_name")
+            val bundleName: String? = null,
+            @SerializedName("domain")
+            val domain: String? = null,
+            @SerializedName("store_url")
+            val storeURL: String? = null,
+            @SerializedName("omid_partner_name")
+            val omidPartnerName: String? = null,
+            @SerializedName("omit_partner_version")
+            val omidPartnerVersion: String? = null,
+            @SerializedName("gdpr_consent_string")
+            val gdprConsentString: String? = null,
+            @SerializedName("key_values")
+            val extParams: List<KeyValuePair>? = null
     ) {
         @Keep
-        data class SChainInfo(
+        data class KeyValuePair(
                 @SerializedName("key")
                 val key: String? = null,
                 @SerializedName("value")
