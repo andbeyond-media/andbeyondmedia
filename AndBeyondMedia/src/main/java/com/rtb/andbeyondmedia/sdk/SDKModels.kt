@@ -5,6 +5,8 @@ import com.google.gson.annotations.SerializedName
 
 @Keep
 internal data class SDKConfig(
+        @SerializedName("home_country")
+        val homeCountry: String = "",
         @SerializedName("aff")
         val affiliatedId: Long? = null,
         @SerializedName("refetch")
@@ -48,7 +50,9 @@ internal data class SDKConfig(
         @SerializedName("unfilled")
         val unfilledConfig: LoadConfigs? = null,
         @SerializedName("supported_sizes")
-        val supportedSizes: List<Size>? = null
+        val supportedSizes: List<Size>? = null,
+        @SerializedName("countries")
+        val countryConfigs: List<CountryConfig>? = null
 ) {
 
     @Keep
@@ -213,4 +217,39 @@ internal data class SDKConfig(
             @SerializedName("number")
             val number: Int? = null
     )
+
+    @Keep
+    data class CountryConfig(
+            @SerializedName("name")
+            val name: String? = null,
+            @SerializedName("diff")
+            val diff: Int? = null,
+            @SerializedName("active")
+            val activeRefreshInterval: Int? = null,
+            @SerializedName("passive")
+            val passiveRefreshInterval: Int? = null,
+            @SerializedName("factor")
+            val factor: Int? = null,
+            @SerializedName("active_factor")
+            val visibleFactor: Int? = null,
+            @SerializedName("min_view")
+            val minView: Int? = null,
+            @SerializedName("min_view_rtb")
+            val minViewRtb: Int? = null,
+            @SerializedName("hijack")
+            val hijackConfig: LoadConfigs? = null,
+            @SerializedName("unfilled")
+            val unfilledConfig: LoadConfigs? = null,
+            @SerializedName("config")
+            val refreshConfig: List<RefreshConfig>? = null,
+            @SerializedName("supported_sizes")
+            val supportedSizes: List<Size>? = null,
+    )
 }
+
+
+@Keep
+data class CountryModel(
+        @SerializedName("countryCode")
+        val countryCode: String? = null
+)
