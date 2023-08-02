@@ -76,7 +76,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         fetchDemand(adRequest) {
             AdManagerInterstitialAd.load(context, adUnit, adRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
-                    interstitialConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                    interstitialConfig.retryConfig = sdkConfig?.retryConfig
                     addGeoEdge(interstitialAd, otherUnit)
                     callBack(interstitialAd)
                     firstLook = false
@@ -194,7 +194,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
-            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
             format = validConfig.format

@@ -11,6 +11,8 @@ internal data class SDKConfig(
         val affiliatedId: Long? = null,
         @SerializedName("refetch")
         val refetch: Long? = null,
+        @SerializedName("country_config")
+        val fetchCountry: Int? = null,
         @SerializedName("retry_config")
         val retryConfig: RetryConfig? = null,
         @SerializedName("info")
@@ -64,23 +66,13 @@ internal data class SDKConfig(
 
     @Keep
     data class RetryConfig(
-            @SerializedName("networks")
-            val networks: String? = null,
             @SerializedName("retries")
             var retries: Int? = null,
             @SerializedName("retry_interval")
             val retryInterval: Int? = null,
-            @SerializedName("adUnits")
+            @SerializedName("alternate_units")
             var adUnits: ArrayList<String> = arrayListOf()
-    ) {
-
-        @Keep
-        fun fillAdUnits() {
-            adUnits = arrayListOf<String>().apply {
-                addAll(networks?.replace(" ", "")?.split(",") ?: arrayListOf())
-            }
-        }
-    }
+    )
 
     @Keep
     data class InfoConfig(

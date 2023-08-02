@@ -156,7 +156,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             position = validConfig.position ?: 0
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
-            retryConfig = sdkConfig?.retryConfig?.also { it.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             hijack = getValidLoadConfig(adType, true, sdkConfig?.hijackConfig, sdkConfig?.unfilledConfig)
             unFilled = getValidLoadConfig(adType, false, sdkConfig?.hijackConfig, sdkConfig?.unfilledConfig)
             difference = sdkConfig?.difference ?: 0
@@ -234,6 +234,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun setCountryConfig() {
+        if (sdkConfig?.fetchCountry != 1) return
         if (!countrySetup.first || countrySetup.second || countrySetup.third == null || countrySetup.third?.countryCode.isNullOrEmpty() || sdkConfig?.homeCountry?.contains(countrySetup.third?.countryCode ?: "IN", true) == true) return
         bannerConfig = bannerConfig.apply {
             val currentCountry = countrySetup.third?.countryCode ?: "IN"
@@ -328,7 +329,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         setCountryConfig()
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
             overridingUnit = null
-            bannerConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            bannerConfig.retryConfig = sdkConfig?.retryConfig
             unfilledRefreshCounter?.cancel()
             val blockedTerms = sdkConfig?.networkBlock?.replace(" ", "")?.split(",") ?: listOf()
             var isNetworkBlocked = false

@@ -99,7 +99,7 @@ class NativeAdManager(private val context: Activity, private val adUnit: String)
         fetchDemand(adRequest) {
             adLoader = AdLoader.Builder(context, adUnit)
                     .forNativeAd { nativeAd: NativeAd ->
-                        nativeConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                        nativeConfig.retryConfig = sdkConfig?.retryConfig
                         addGeoEdge(nativeAd, otherUnit)
                         callBack(nativeAd)
                         firstLook = false
@@ -252,7 +252,7 @@ class NativeAdManager(private val context: Activity, private val adUnit: String)
             isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
-            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
         }

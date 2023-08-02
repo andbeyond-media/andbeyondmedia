@@ -75,7 +75,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
         fetchDemand(adRequest) {
             RewardedInterstitialAd.load(context, adUnit, adRequest, object : RewardedInterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedInterstitialAd) {
-                    config.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                    config.retryConfig = sdkConfig?.retryConfig
                     addGeoEdge(ad, firstLook)
                     callBack(ad)
                     firstLook = false
@@ -194,7 +194,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
             isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
-            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             hijack = sdkConfig?.hijackConfig?.reward ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.reward ?: sdkConfig?.unfilledConfig?.other
         }

@@ -76,7 +76,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                 appOpenAd = ad
                 isLoadingAd = false
                 loadTime = Date().time
-                appOpenConfig.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                appOpenConfig.retryConfig = sdkConfig?.retryConfig
                 adLoadCallback?.onAdLoaded()
             }
 
@@ -172,7 +172,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             customUnitName = String.format("/%s/%s-%s", networkName, sdkConfig?.affiliatedId.toString(), validConfig.nameType ?: "")
             position = validConfig.position ?: 0
             isNewUnit = loadingAdUnit?.contains(sdkConfig?.networkId ?: "") ?: false
-            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             newUnit = sdkConfig?.hijackConfig?.newUnit
             hijack = sdkConfig?.hijackConfig?.appOpen ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.appOpen ?: sdkConfig?.unfilledConfig?.other

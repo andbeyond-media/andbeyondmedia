@@ -73,7 +73,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
         fetchDemand(adRequest) {
             RewardedAd.load(context, adUnit, adRequest, object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
-                    config.retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+                    config.retryConfig = sdkConfig?.retryConfig
                     addGeoEdge(ad, otherUnit)
                     callBack(ad)
                     firstLook = false
@@ -190,7 +190,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
             position = validConfig.position ?: 0
             isNewUnit = adUnit.contains(sdkConfig?.networkId ?: "")
             placement = validConfig.placement
-            retryConfig = sdkConfig?.retryConfig.also { it?.fillAdUnits() }
+            retryConfig = sdkConfig?.retryConfig
             newUnit = sdkConfig?.hijackConfig?.newUnit
             hijack = sdkConfig?.hijackConfig?.rewardVideos ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.rewardVideos ?: sdkConfig?.unfilledConfig?.other

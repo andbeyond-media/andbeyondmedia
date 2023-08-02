@@ -34,7 +34,6 @@ object AndBeyondMedia {
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         this.logEnabled = logsEnabled
         fetchConfig(context)
-        fetchCountry(context)
     }
 
     internal fun getStoreService(context: Context): StoreService {
@@ -98,6 +97,7 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
+                    fetchCountry(context)
                     specialTag = storeService.config?.infoConfig?.specialTag
                     logEnabled = (logEnabled || storeService.config?.infoConfig?.normalInfo == 1)
                     SDKManager.initialize(context)
@@ -119,7 +119,7 @@ object AndBeyondMedia {
             val workManager = getWorkManager(context)
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
         } catch (e: Throwable) {
-
+            e.stackTrace
         }
     }
 }
