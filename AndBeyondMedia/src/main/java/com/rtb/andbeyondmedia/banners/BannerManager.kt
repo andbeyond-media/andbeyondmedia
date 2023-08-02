@@ -20,6 +20,7 @@ import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.CountryDetectionWorker
 import com.rtb.andbeyondmedia.sdk.CountryModel
+import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.BannerAdUnit
@@ -167,6 +168,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             minView = sdkConfig?.minView ?: 0
             minViewRtb = sdkConfig?.minViewRtb ?: 0
             format = validConfig.format
+            fallback = sdkConfig?.fallback
             this.adSizes = if (validConfig.follow == 1 && !validConfig.sizes.isNullOrEmpty()) {
                 getCustomSizes(adSizes, validConfig.sizes)
             } else {
@@ -265,6 +267,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             validCountryConfig.visibleFactor?.let { visibleFactor = it }
             validCountryConfig.minView?.let { minView = it }
             validCountryConfig.minViewRtb?.let { minViewRtb = it }
+            validCountryConfig.fallback?.let { fallback = it }
         }
         countrySetup = Triple(countrySetup.first, true, countrySetup.third)
         view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
@@ -607,5 +610,29 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun allowCallback(refreshLoad: Boolean): Boolean {
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
+    }
+
+    fun checkFallback(refreshLoad: Boolean): Boolean {
+        if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
+            val matchedBanners = arrayListOf<Fallback.Banner>()
+            pubAdSizes.forEach { pubSize ->
+                bannerConfig.fallback?.banners?.firstOrNull { (it.width?.toIntOrNull() ?: 0) == pubSize.width && (it.height?.toIntOrNull() ?: 0) == pubSize.height }?.let { matchedSize ->
+                    matchedBanners.add(matchedSize)
+                }
+            }
+            var biggestBanner: Fallback.Banner? = null
+            var maxArea = 0
+            matchedBanners.forEach {
+                if (maxArea < ((it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0))) {
+                    biggestBanner = it
+                    maxArea = (it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0)
+                }
+            }
+
+            biggestBanner?.let { bannerListener.attachFallback(it) }
+            return biggestBanner != null
+        } else {
+            return false
+        }
     }
 }

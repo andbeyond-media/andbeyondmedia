@@ -54,7 +54,9 @@ internal data class SDKConfig(
         @SerializedName("supported_sizes")
         val supportedSizes: List<Size>? = null,
         @SerializedName("countries")
-        val countryConfigs: List<CountryConfig>? = null
+        val countryConfigs: List<CountryConfig>? = null,
+        @SerializedName("fallback")
+        val fallback: Fallback? = null
 ) {
 
     @Keep
@@ -252,6 +254,30 @@ internal data class SDKConfig(
             val refreshConfig: List<RefreshConfig>? = null,
             @SerializedName("supported_sizes")
             val supportedSizes: List<Size>? = null,
+            @SerializedName("fallback")
+            val fallback: Fallback? = null
+    )
+}
+
+@Keep
+data class Fallback(
+        @SerializedName("firstlook")
+        val firstlook: Int? = null,
+        @SerializedName("other")
+        val other: Int? = null,
+        @SerializedName("banners")
+        val banners: List<Banner>? = null
+) {
+    @Keep
+    data class Banner(
+            @SerializedName("width")
+            val width: String? = null,
+            @SerializedName("height")
+            val height: String? = null,
+            @SerializedName("image")
+            val image: String? = null,
+            @SerializedName("url")
+            val url: String? = null
     )
 }
 

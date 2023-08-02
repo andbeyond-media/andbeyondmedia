@@ -3,6 +3,7 @@ package com.rtb.andbeyondmedia.banners
 import androidx.annotation.Keep
 import com.google.android.gms.ads.AdSize
 import com.google.gson.annotations.SerializedName
+import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import java.util.Date
 
@@ -53,5 +54,7 @@ internal data class BannerConfig(
         var lastActiveOpportunity: Long = Date().time,
         var lastPassiveOpportunity: Long = Date().time,
         @SerializedName("format")
-        var format: String? = null
+        var format: String? = null,
+        @SerializedName("fallback")
+        var fallback: Fallback? = null
 )

@@ -1,7 +1,11 @@
 package com.rtb.andbeyondmedia.banners
 
 import android.content.Context
+import android.content.Intent
+import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.util.AttributeSet
+import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
@@ -12,6 +16,11 @@ import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
 import com.appharbr.sdk.engine.adformat.AdFormat
 import com.appharbr.sdk.engine.listeners.AHIncident
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
@@ -20,9 +29,12 @@ import com.google.gson.Gson
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.common.dpToPx
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
+import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
@@ -105,6 +117,49 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         log { "attachAdView : $adUnitId" }
     }
 
+    override fun attachFallback(fallbackBanner: Fallback.Banner) {
+        val imageView = ImageView(context)
+        imageView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+        imageView.scaleType = ImageView.ScaleType.FIT_XY
+        binding.root.removeAllViews()
+        binding.root.addView(imageView)
+        loadFallbackAd(imageView, fallbackBanner)
+    }
+
+    private fun loadFallbackAd(ad: ImageView, fallbackBanner: Fallback.Banner) {
+        fun sendFailure(error: String) {
+            if (bannerManager.allowCallback(isRefreshLoaded)) {
+                bannerAdListener?.onAdFailedToLoad(error, false)
+            }
+        }
+        try {
+            Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
+                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
+                    sendFailure(e?.message ?: "")
+                    return false
+                }
+
+                override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                    adListener.onAdLoaded()
+                    adListener.onAdImpression()
+                    return false
+                }
+            }).into(ad)
+        } catch (e: Exception) {
+            sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
+        }
+
+        ad.setOnClickListener {
+            try {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackBanner.url ?: ""))
+                context.startActivity(browserIntent)
+            } catch (e: Throwable) {
+                e.printStackTrace()
+            }
+            adListener.onAdClicked()
+        }
+    }
+
     fun setAdSize(adSize: BannerAdSize) = setAdSizes(adSize)
 
     fun setAdSizes(vararg adSizes: BannerAdSize) {
@@ -138,7 +193,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         fun load() {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${Gson().toJson(adRequest.customTargeting)}" }
-                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting["retry"] == "0"
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting["retry"] != "1"
                 bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
             }
         }
@@ -202,11 +257,19 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (firstLook) {
                 firstLook = false
             }
-            val retryStatus = try {
+            var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
             } catch (e: Exception) {
                 e.printStackTrace()
                 false
+            }
+            if (!retryStatus) {
+                retryStatus = try {
+                    bannerManager.checkFallback(isRefreshLoaded)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
+                }
             }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdFailedToLoad(p0.toString(), retryStatus)
