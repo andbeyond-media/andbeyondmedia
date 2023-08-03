@@ -4,7 +4,6 @@ internal const val TAG = "Ads"
 
 internal object URLs {
      const val BASE_URL = "https://prebid.andbeyond.media/"
-    const val COUNTRY_DETECTION_URL = "https://rtbdemand.apiip.net/api/"
 }
 
 object AdTypes {

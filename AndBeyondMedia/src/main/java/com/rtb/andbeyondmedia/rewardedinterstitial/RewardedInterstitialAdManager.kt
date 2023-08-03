@@ -206,7 +206,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", adUnit)
-        addCustomTargeting("hb_format", "video")
+        addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
         if (unfilled) addCustomTargeting("retry", "1")
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()

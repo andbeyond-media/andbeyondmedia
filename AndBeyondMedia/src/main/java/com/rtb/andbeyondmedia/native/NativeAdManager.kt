@@ -264,6 +264,7 @@ class NativeAdManager(private val context: Activity, private val adUnit: String)
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", adUnit)
+        addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
         if (unfilled) addCustomTargeting("retry", "1")
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()

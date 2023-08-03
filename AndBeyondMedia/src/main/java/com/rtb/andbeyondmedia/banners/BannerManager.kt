@@ -169,6 +169,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             minViewRtb = sdkConfig?.minViewRtb ?: 0
             format = validConfig.format
             fallback = sdkConfig?.fallback
+            geoEdge = sdkConfig?.geoEdge
             this.adSizes = if (validConfig.follow == 1 && !validConfig.sizes.isNullOrEmpty()) {
                 getCustomSizes(adSizes, validConfig.sizes)
             } else {
@@ -236,7 +237,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun setCountryConfig() {
-        if (sdkConfig?.fetchCountry != 1) return
+        if (sdkConfig?.countryStatus?.active != 1) return
         if (!countrySetup.first || countrySetup.second || countrySetup.third == null || countrySetup.third?.countryCode.isNullOrEmpty() || sdkConfig?.homeCountry?.contains(countrySetup.third?.countryCode ?: "IN", true) == true) return
         bannerConfig = bannerConfig.apply {
             val currentCountry = countrySetup.third?.countryCode ?: "IN"
@@ -268,6 +269,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             validCountryConfig.minView?.let { minView = it }
             validCountryConfig.minViewRtb?.let { minViewRtb = it }
             validCountryConfig.fallback?.let { fallback = it }
+            validCountryConfig.geoEdge?.let { geoEdge = it }
         }
         countrySetup = Triple(countrySetup.first, true, countrySetup.third)
         view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
@@ -279,10 +281,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun adReported(creativeId: String?, reportReasons: List<String>) {
-        if (sdkConfig?.geoEdge?.creativeIds?.replace(" ", "")?.split(",")?.contains(creativeId) == true) {
+        if (bannerConfig.geoEdge?.creativeIds?.replace(" ", "")?.split(",")?.contains(creativeId) == true) {
             refreshBlocked = true
         }
-        val configReasons = sdkConfig?.geoEdge?.reasons?.replace(" ", "")?.split(",")
+        val configReasons = bannerConfig.geoEdge?.reasons?.replace(" ", "")?.split(",")
         configReasons?.forEach { reason ->
             if (reportReasons.any { reason.contains(it) }) {
                 refreshBlocked = true
@@ -505,7 +507,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
-        addCustomTargeting("hb_format", "amp")
+        addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
         addCustomTargeting("visible", isForegroundRefresh.toString())
         addCustomTargeting("min_view", (if (bannerConfig.isVisibleFor > 10) 10 else bannerConfig.isVisibleFor).toString())
         if (unfilled) addCustomTargeting("retry", "1")
@@ -536,8 +538,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
         val number = (1..100).random()
-        if ((firstLook && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
-                (!firstLook && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
+        if ((firstLook && (number in 1..(bannerConfig.geoEdge?.firstLook ?: 0))) ||
+                (!firstLook && (number in 1..(bannerConfig.geoEdge?.other ?: 0)))) {
             callback()
         }
     }
@@ -627,6 +629,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     biggestBanner = it
                     maxArea = (it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0)
                 }
+            }
+
+            if (biggestBanner == null) {
+                biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height == "all" && it.width == "all" }
             }
 
             biggestBanner?.let { bannerListener.attachFallback(it) }

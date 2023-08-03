@@ -2,6 +2,7 @@ package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
+import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 @Keep
 internal data class SDKConfig(
@@ -9,10 +10,12 @@ internal data class SDKConfig(
         val homeCountry: String = "",
         @SerializedName("aff")
         val affiliatedId: Long? = null,
+        @SerializedName("hb_format")
+        val hbFormat: String? = null,
         @SerializedName("refetch")
         val refetch: Long? = null,
-        @SerializedName("country_config")
-        val fetchCountry: Int? = null,
+        @SerializedName("country_status")
+        val countryStatus: CountryStatus? = null,
         @SerializedName("retry_config")
         val retryConfig: RetryConfig? = null,
         @SerializedName("info")
@@ -229,6 +232,14 @@ internal data class SDKConfig(
     )
 
     @Keep
+    data class CountryStatus(
+            @SerializedName("active")
+            val active: Int? = null,
+            @SerializedName("url")
+            val url: String? = null
+    )
+
+    @Keep
     data class CountryConfig(
             @SerializedName("name")
             val name: String? = null,
@@ -255,7 +266,9 @@ internal data class SDKConfig(
             @SerializedName("supported_sizes")
             val supportedSizes: List<Size>? = null,
             @SerializedName("fallback")
-            val fallback: Fallback? = null
+            val fallback: Fallback? = null,
+            @SerializedName("geoedge")
+            val geoEdge: GeoEdge? = null,
     )
 }
 
@@ -284,6 +297,6 @@ data class Fallback(
 
 @Keep
 data class CountryModel(
-        @SerializedName("countryCode")
+        @SerializedName("countryCode", alternate = ["country"])
         val countryCode: String? = null
 )

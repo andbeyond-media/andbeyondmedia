@@ -10,7 +10,6 @@ import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListene
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
-import com.rtb.andbeyondmedia.common.URLs.COUNTRY_DETECTION_URL
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -57,14 +56,14 @@ object AndBeyondMedia {
         return configService as ConfigService
     }
 
-    internal fun getCountryService(): CountryService {
+    internal fun getCountryService(baseUrl: String): CountryService {
         @Synchronized
         if (countryService == null) {
             val client = OkHttpClient.Builder()
                     .connectTimeout(3, TimeUnit.SECONDS)
                     .writeTimeout(3, TimeUnit.SECONDS)
                     .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
-            countryService = Retrofit.Builder().baseUrl(COUNTRY_DETECTION_URL).client(client)
+            countryService = Retrofit.Builder().baseUrl(baseUrl).client(client)
                     .addConverterFactory(GsonConverterFactory.create()).build().create(CountryService::class.java)
         }
         return countryService as CountryService
@@ -97,11 +96,14 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
-                    fetchCountry(context)
-                    specialTag = storeService.config?.infoConfig?.specialTag
-                    logEnabled = (logEnabled || storeService.config?.infoConfig?.normalInfo == 1)
+                    val config = storeService.config
+                    specialTag = config?.infoConfig?.specialTag
+                    logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
+                    if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
+                        fetchCountry(context, config.countryStatus.url)
+                    }
                     SDKManager.initialize(context)
-                    if (storeService.config != null && storeService.config?.refetch != null) {
+                    if (config?.refetch != null) {
                         fetchConfig(context, storeService.config?.refetch)
                     }
                 }
@@ -111,10 +113,12 @@ object AndBeyondMedia {
         }
     }
 
-    private fun fetchCountry(context: Context) {
+    private fun fetchCountry(context: Context, baseUrl: String) {
         try {
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<CountryDetectionWorker>().setConstraints(constraints).build()
+            val data = Data.Builder()
+            data.putString("URL", baseUrl)
+            val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<CountryDetectionWorker>().setConstraints(constraints).setInputData(data.build()).build()
             val workName: String = CountryDetectionWorker::class.java.simpleName
             val workManager = getWorkManager(context)
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
@@ -151,15 +155,31 @@ internal class CountryDetectionWorker(private val context: Context, params: Work
     override fun doWork(): Result {
         val storeService = AndBeyondMedia.getStoreService(context)
         return try {
-            val countryService = AndBeyondMedia.getCountryService()
-            val response = countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode")).execute()
-            if (response.isSuccessful && response.body() != null) {
-                storeService.detectedCountry = response.body()
-                Result.success()
+            var baseUrl = inputData.getString("URL")
+            baseUrl = if (baseUrl?.contains("apiip") == true) {
+                baseUrl.substring(0, baseUrl.indexOf("check"))
+            } else if (baseUrl?.contains("andbeyond") == true) {
+                baseUrl.substring(0, baseUrl.indexOf("maxmind"))
             } else {
-                Result.failure()
+                ""
             }
-        } catch (e: Exception) {
+            if (baseUrl.isEmpty()) {
+                Result.failure()
+            } else {
+                val countryService = AndBeyondMedia.getCountryService(baseUrl)
+                val response = if (baseUrl.contains("apiip")) {
+                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode")).execute()
+                } else {
+                    countryService.getConfig().execute()
+                }
+                if (response.isSuccessful && response.body() != null) {
+                    storeService.detectedCountry = response.body()
+                    Result.success()
+                } else {
+                    Result.failure()
+                }
+            }
+        } catch (e: Throwable) {
             Logger.ERROR.log(msg = e.message ?: "")
             Result.failure()
         }
@@ -240,6 +260,9 @@ internal interface ConfigService {
 internal interface CountryService {
     @GET("check")
     fun getConfig(@QueryMap params: HashMap<String, Any>): Call<CountryModel>
+
+    @GET("maxmind.php")
+    fun getConfig(): Call<CountryModel>
 }
 
 internal class StoreService(private val prefs: SharedPreferences) {

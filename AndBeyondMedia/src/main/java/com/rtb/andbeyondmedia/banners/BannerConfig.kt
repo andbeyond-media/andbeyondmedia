@@ -56,5 +56,7 @@ internal data class BannerConfig(
         @SerializedName("format")
         var format: String? = null,
         @SerializedName("fallback")
-        var fallback: Fallback? = null
+        var fallback: Fallback? = null,
+        @SerializedName("geoedge")
+        var geoEdge: SDKConfig.GeoEdge? = null,
 )

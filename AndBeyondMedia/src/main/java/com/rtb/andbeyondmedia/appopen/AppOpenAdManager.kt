@@ -194,7 +194,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", loadingAdUnit ?: "")
-        addCustomTargeting("hb_format", "amp")
+        addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
         if (unfilled) addCustomTargeting("retry", "1")
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
