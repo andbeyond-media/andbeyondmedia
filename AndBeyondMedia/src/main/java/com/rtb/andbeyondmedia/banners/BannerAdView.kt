@@ -90,10 +90,10 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         attrs?.let {
             context.obtainStyledAttributes(it, R.styleable.BannerAdView).apply {
                 val adUnitId = getString(R.styleable.BannerAdView_adUnitId) ?: ""
-                val adSize = getString(R.styleable.BannerAdView_adSize) ?: "BANNER"
+                val adSize = getString(R.styleable.BannerAdView_adSize)
                 var adSizes = getString(R.styleable.BannerAdView_adSizes) ?: "BANNER"
                 adType = getString(R.styleable.BannerAdView_adType) ?: AdTypes.BANNER
-                if (!adSizes.contains(adSize)) {
+                if (adSize != null && !adSizes.contains(adSize)) {
                     adSizes = if (adSizes.isEmpty()) adSize
                     else String.format(Locale.ENGLISH, "%s,%s", adSizes, adSize)
                 }

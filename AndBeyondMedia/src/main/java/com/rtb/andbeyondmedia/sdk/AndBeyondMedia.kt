@@ -205,22 +205,22 @@ internal object SDKManager {
         PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
         PrebidMobile.setShareGeoLocation(prebid?.location == null || prebid.location == 1)
         prebid?.gdpr?.let { TargetingParams.setSubjectToGDPR(it == 1) }
-        if (prebid?.gdprConsentString.isNullOrEmpty()) {
-            TargetingParams.setGDPRConsentString(prebid?.gdprConsentString)
+        if (TargetingParams.isSubjectToGDPR() == true) {
+            TargetingParams.setGDPRConsentString(TargetingParams.getGDPRConsentString())
         }
-        if (prebid?.bundleName.isNullOrEmpty()) {
+        if (!prebid?.bundleName.isNullOrEmpty()) {
             TargetingParams.setBundleName(prebid?.bundleName)
         }
-        if (prebid?.domain.isNullOrEmpty()) {
+        if (!prebid?.domain.isNullOrEmpty()) {
             TargetingParams.setDomain(prebid?.domain)
         }
-        if (prebid?.storeURL.isNullOrEmpty()) {
+        if (!prebid?.storeURL.isNullOrEmpty()) {
             TargetingParams.setStoreUrl(prebid?.storeURL)
         }
-        if (prebid?.omidPartnerName.isNullOrEmpty()) {
+        if (!prebid?.omidPartnerName.isNullOrEmpty()) {
             TargetingParams.setOmidPartnerName(prebid?.omidPartnerName)
         }
-        if (prebid?.omidPartnerVersion.isNullOrEmpty()) {
+        if (!prebid?.omidPartnerVersion.isNullOrEmpty()) {
             TargetingParams.setOmidPartnerVersion(prebid?.omidPartnerVersion)
         }
         if (!prebid?.extParams.isNullOrEmpty()) {

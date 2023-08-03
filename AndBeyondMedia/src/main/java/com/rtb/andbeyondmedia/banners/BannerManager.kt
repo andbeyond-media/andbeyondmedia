@@ -632,11 +632,22 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
 
             if (biggestBanner == null) {
-                biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height == "all" && it.width == "all" }
+                var biggestPubSize: AdSize? = null
+                maxArea = 0
+                pubAdSizes.forEach {
+                    if (maxArea < (it.width * it.height)) {
+                        biggestPubSize = it
+                        maxArea = (it.width * it.height)
+                    }
+                }
+                biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height == "all" && it.width == "all" }?.apply {
+                    height = biggestPubSize?.height.toString()
+                    width = biggestPubSize?.width.toString()
+                }
             }
 
             biggestBanner?.let { bannerListener.attachFallback(it) }
-            return biggestBanner != null
+            return biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)
         } else {
             return false
         }

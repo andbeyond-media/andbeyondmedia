@@ -117,8 +117,6 @@ internal data class SDKConfig(
             val omidPartnerName: String? = null,
             @SerializedName("omit_partner_version")
             val omidPartnerVersion: String? = null,
-            @SerializedName("gdpr_consent_string")
-            val gdprConsentString: String? = null,
             @SerializedName("key_values")
             val extParams: List<KeyValuePair>? = null
     ) {
@@ -284,9 +282,9 @@ data class Fallback(
     @Keep
     data class Banner(
             @SerializedName("width")
-            val width: String? = null,
+            var width: String? = null,
             @SerializedName("height")
-            val height: String? = null,
+            var height: String? = null,
             @SerializedName("image")
             val image: String? = null,
             @SerializedName("url")
