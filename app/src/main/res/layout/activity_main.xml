@@ -113,7 +113,7 @@
         android:id="@+id/banner_ad"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:adSizes="MEDIUM_RECTANGLE"
+        app:adSizes="BANNER"
         app:adType="BANNER"
         app:adUnitId="/6499/example/banner1"
         app:layout_constraintBottom_toBottomOf="parent"
