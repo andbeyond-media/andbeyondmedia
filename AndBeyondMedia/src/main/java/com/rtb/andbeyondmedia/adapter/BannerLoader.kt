@@ -82,6 +82,8 @@ internal class BannerLoader(private val mediationBannerAdConfiguration: Mediatio
     }
 
     override fun onAdImpression() {
-        bannerAdCallback.reportAdImpression()
+        if (this::bannerAdCallback.isInitialized) {
+            bannerAdCallback.reportAdImpression()
+        }
     }
 }
