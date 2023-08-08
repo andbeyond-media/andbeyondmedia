@@ -47,6 +47,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var adType: String = ""
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
+    private var nativePending = true
 
     init {
         sdkConfig = storeService.config
@@ -306,6 +307,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
             if (isPublisherLoad) {
                 refresh(unfilled = true)
                 return true
+            } else if (nativePending && ifNativePossible() != null) {
+                nativePending = false
+                refresh(unfilled = true, native = ifNativePossible())
+                return true
             } else {
                 if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
                     bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
@@ -428,12 +433,16 @@ internal class BannerManager(private val context: Context, private val bannerLis
         unfilledRefreshCounter?.start()
     }
 
-    fun refresh(active: Int = 1, unfilled: Boolean = false) {
+    fun refresh(active: Int = 1, unfilled: Boolean = false, native: AdSize? = null) {
         val currentTimeStamp = Date().time
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
-            bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
-            loadAd(active, unfilled)
+            if (native != null) {
+                bannerListener.tryNative(getAdUnitName(unfilled, false), native, createRequest(1, unfilled = true))
+            } else {
+                bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
+                loadAd(active, unfilled)
+            }
         }
 
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
@@ -651,5 +660,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } else {
             return false
         }
+    }
+
+    private fun ifNativePossible(): AdSize? {
+        var maxArea: Int
+        var biggestPubSize: AdSize? = null
+        maxArea = 0
+        pubAdSizes.forEach {
+            if (maxArea < (it.width * it.height)) {
+                biggestPubSize = it
+                maxArea = (it.width * it.height)
+            }
+        }
+        return if (biggestPubSize != null && biggestPubSize!!.height > 120 && biggestPubSize!!.width > 120) biggestPubSize else null
     }
 }

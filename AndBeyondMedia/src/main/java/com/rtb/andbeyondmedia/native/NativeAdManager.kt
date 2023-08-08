@@ -1,6 +1,6 @@
 package com.rtb.andbeyondmedia.native
 
-import android.app.Activity
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.Observer
@@ -31,7 +31,7 @@ import org.prebid.mobile.NativeEventTracker
 import org.prebid.mobile.NativeImageAsset
 import org.prebid.mobile.NativeTitleAsset
 
-class NativeAdManager(private val context: Activity, private val adUnit: String) {
+class NativeAdManager(private val context: Context, private val adUnit: String) {
 
     private var sdkConfig: SDKConfig? = null
     private var nativeConfig: InterstitialConfig = InterstitialConfig()

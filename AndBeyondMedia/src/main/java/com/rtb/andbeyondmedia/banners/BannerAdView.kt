@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.AttributeSet
+import android.view.LayoutInflater
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -31,6 +33,8 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.dpToPx
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.databinding.NativeAdViewBinding
+import com.rtb.andbeyondmedia.native.NativeAdManager
 import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
@@ -115,6 +119,34 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         binding.root.removeAllViews()
         binding.root.addView(adView)
         log { "attachAdView : $adUnitId" }
+    }
+
+    override fun tryNative(adUnitId: String, adSize: AdSize, request: AdRequest) {
+        val nativeAdView = NativeAdViewBinding.inflate(LayoutInflater.from(context))
+        nativeAdView.wrapperLayout.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, context.dpToPx(adSize.height))
+        binding.root.removeAllViews()
+        binding.root.addView(nativeAdView.root)
+        loadNative(adUnitId, nativeAdView, request)
+    }
+
+    private fun loadNative(adUnitId: String, binding: NativeAdViewBinding, request: AdRequest) {
+        val nativeAdManger = NativeAdManager(context, adUnitId)
+        nativeAdManger.setAdListener(adListener)
+        nativeAdManger.load(request) {
+            it?.let {
+                binding.mediaView.mediaContent = it.mediaContent
+                binding.mediaView.setImageScaleType(ImageView.ScaleType.CENTER_CROP)
+                binding.root.mediaView = binding.mediaView
+                binding.title.text = it.headline
+                binding.root.headlineView = binding.title
+                binding.description.text = it.body
+                binding.root.bodyView = binding.description
+                binding.icon.setImageURI(it.icon?.uri)
+                binding.icon.setImageDrawable(it.icon?.drawable)
+                binding.root.iconView = binding.icon
+                binding.root.setNativeAd(it)
+            }
+        }
     }
 
     override fun attachFallback(fallbackBanner: Fallback.Banner) {
