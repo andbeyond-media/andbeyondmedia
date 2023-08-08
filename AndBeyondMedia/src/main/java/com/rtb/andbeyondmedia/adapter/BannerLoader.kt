@@ -72,10 +72,8 @@ internal class BannerLoader(private val mediationBannerAdConfiguration: Mediatio
     }
 
     override fun onAdFailedToLoad(p0: LoadAdError) {
-        if (this::bannerAdCallback.isInitialized) {
-            Logger.ERROR.log(TAG, "Failed to fetch the banner ad.")
-            mediationAdLoadCallback.onFailure(p0)
-        }
+        Logger.ERROR.log(TAG, "Failed to fetch the banner ad.")
+        mediationAdLoadCallback.onFailure(p0)
     }
 
     override fun onAdLoaded() {
