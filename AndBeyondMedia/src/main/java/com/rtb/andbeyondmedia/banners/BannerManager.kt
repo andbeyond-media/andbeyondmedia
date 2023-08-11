@@ -298,19 +298,26 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    fun adFailedToLoad(isPublisherLoad: Boolean): Boolean {
-        setCountryConfig()
-        view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
-        view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
+    fun adFailedToLoad(isPublisherLoad: Boolean, recalled: Boolean = false): Boolean {
+        if (!recalled) {
+            setCountryConfig()
+            view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
+            view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
+        }
         if (bannerConfig.unFilled?.status == 1) {
-            startUnfilledRefreshCounter()
+            if (!recalled) {
+                startUnfilledRefreshCounter()
+            }
             if (isPublisherLoad) {
                 refresh(unfilled = true)
                 return true
-            } else if (nativePending && ifNativePossible() != null) {
+            } else if (nativePending) {
                 nativePending = false
-                refresh(unfilled = true, native = ifNativePossible())
-                return true
+                ifNativePossible()?.let {
+                    refresh(unfilled = true, native = it)
+                    return true
+                }
+                return adFailedToLoad(isPublisherLoad = false, recalled = true)
             } else {
                 if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
                     bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
@@ -338,6 +345,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         adImpressed()
         setCountryConfig()
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
+            nativePending = true
             overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig
             unfilledRefreshCounter?.cancel()
