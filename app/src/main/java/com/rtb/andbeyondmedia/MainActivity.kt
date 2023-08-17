@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         //loadRewarded()
         //loadAdaptiveAd()
         //loadNative()
+        // loadNativeStyle()
     }
 
     private fun init() {
@@ -56,6 +57,10 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
         binding.bannerAd.setAdListener(this)
+    }
+
+    private fun loadNativeStyle() {
+        //  binding.fluidView.loadAd(AdManagerAdRequest.Builder().build())
     }
 
     private fun loadNative() {

@@ -9,8 +9,6 @@ internal interface BannerManagerListener {
     fun attachFallback(fallbackBanner: Fallback.Banner)
 
     fun loadAd(request: AdRequest): Boolean
-
-    fun tryNative(adUnitId: String, adSize: AdSize, request: AdRequest)
 }
 
 interface FullScreenContentCallback {

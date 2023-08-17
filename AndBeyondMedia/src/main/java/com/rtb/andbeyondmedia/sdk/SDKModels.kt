@@ -59,7 +59,9 @@ internal data class SDKConfig(
         @SerializedName("countries")
         val countryConfigs: List<CountryConfig>? = null,
         @SerializedName("fallback")
-        val fallback: Fallback? = null
+        val fallback: Fallback? = null,
+        @SerializedName("native_fallback")
+        val nativeFallback: Int? = null
 ) {
 
     @Keep
@@ -267,6 +269,8 @@ internal data class SDKConfig(
             val fallback: Fallback? = null,
             @SerializedName("geoedge")
             val geoEdge: GeoEdge? = null,
+            @SerializedName("native_fallback")
+            val nativeFallback: Int? = null
     )
 }
 
