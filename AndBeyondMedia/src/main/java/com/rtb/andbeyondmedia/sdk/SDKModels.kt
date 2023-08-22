@@ -227,6 +227,8 @@ internal data class SDKConfig(
     data class LoadConfig(
             @SerializedName("status")
             val status: Int? = null,
+            @SerializedName("per")
+            val per: Int? = null,
             @SerializedName("number")
             val number: Int? = null
     )

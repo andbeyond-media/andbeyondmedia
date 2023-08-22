@@ -56,7 +56,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
-                } else if (config.hijack?.status == 1) {
+                } else if (checkHijack(config.hijack)) {
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
@@ -67,6 +67,15 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
             } else {
                 loadAd(adUnit, adManagerAdRequest!!, callBack)
             }
+        }
+    }
+
+    private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
+        return if (hijackConfig?.status == 1) {
+            val number = (1..100).random()
+            number in 1..(hijackConfig.per ?: 100)
+        } else {
+            false
         }
     }
 

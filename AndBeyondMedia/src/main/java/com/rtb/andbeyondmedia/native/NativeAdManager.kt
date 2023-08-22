@@ -80,7 +80,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
-                } else if (nativeConfig.hijack?.status == 1) {
+                } else if (checkHijack(nativeConfig.hijack)) {
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
@@ -91,6 +91,15 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
             } else {
                 loadAd(adUnit, adManagerAdRequest!!, callBack)
             }
+        }
+    }
+
+    private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
+        return if (hijackConfig?.status == 1) {
+            val number = (1..100).random()
+            number in 1..(hijackConfig.per ?: 100)
+        } else {
+            false
         }
     }
 

@@ -54,7 +54,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest, adLoadCallback)
                     }
-                } else if (appOpenConfig.hijack?.status == 1) {
+                } else if (checkHijack(appOpenConfig.hijack)) {
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = true, newUnit = false), adManagerAdRequest, adLoadCallback)
@@ -65,6 +65,15 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             } else {
                 loadAd(context, loadingAdUnit!!, adManagerAdRequest, adLoadCallback)
             }
+        }
+    }
+
+    private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
+        return if (hijackConfig?.status == 1) {
+            val number = (1..100).random()
+            number in 1..(hijackConfig.per ?: 100)
+        } else {
+            false
         }
     }
 

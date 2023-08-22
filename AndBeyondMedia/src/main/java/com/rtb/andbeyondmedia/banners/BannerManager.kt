@@ -548,7 +548,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             })
             view.log { "checkOverride: new Unit" }
             return createRequest(1).getAdRequest()
-        } else if (bannerConfig.hijack?.status == 1) {
+        } else if (checkHijack(bannerConfig.hijack)) {
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes.apply {
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
@@ -558,6 +558,15 @@ internal class BannerManager(private val context: Context, private val bannerLis
             return createRequest(1, hijacked = true).getAdRequest()
         }
         return null
+    }
+
+    private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
+        return if (hijackConfig?.status == 1) {
+            val number = (1..100).random()
+            number in 1..(hijackConfig.per ?: 100)
+        } else {
+            false
+        }
     }
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
