@@ -107,7 +107,10 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
         adView = AdManagerAdView(mContext)
-        currentAdSizes = adSizes
+        adView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        if (adSizes.none { it == AdSize.FLUID }) {
+            currentAdSizes = adSizes
+        }
         currentAdUnit = adUnitId
         adView.setAdSizes(*adSizes.toTypedArray())
         adView.adUnitId = adUnitId

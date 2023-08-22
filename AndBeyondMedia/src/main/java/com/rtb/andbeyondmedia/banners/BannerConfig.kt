@@ -16,7 +16,7 @@ internal data class BannerConfig(
         @SerializedName("publisherAdUnit")
         var publisherAdUnit: String = "",
         @SerializedName("adSizes")
-        var adSizes: List<AdSize> = arrayListOf(),
+        var adSizes: ArrayList<AdSize> = arrayListOf(),
         @SerializedName("position")
         var position: Int = 0,
         @SerializedName("retryConfig")
@@ -59,4 +59,6 @@ internal data class BannerConfig(
         var fallback: Fallback? = null,
         @SerializedName("geoedge")
         var geoEdge: SDKConfig.GeoEdge? = null,
+        @SerializedName("native_fallback")
+        var nativeFallback: Int? = null
 )

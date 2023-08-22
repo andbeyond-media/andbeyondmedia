@@ -58,6 +58,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun convertStringSizesToAdSizes(adSizes: String): ArrayList<AdSize> {
         fun getAdSizeObj(adSize: String) = when (adSize) {
+            "FLUID" -> AdSize.FLUID
             "BANNER" -> AdSize.BANNER
             "LARGE_BANNER" -> AdSize.LARGE_BANNER
             "MEDIUM_RECTANGLE" -> AdSize.MEDIUM_RECTANGLE
@@ -170,6 +171,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             format = validConfig.format
             fallback = sdkConfig?.fallback
             geoEdge = sdkConfig?.geoEdge
+            nativeFallback = sdkConfig?.nativeFallback
             this.adSizes = if (validConfig.follow == 1 && !validConfig.sizes.isNullOrEmpty()) {
                 getCustomSizes(adSizes, validConfig.sizes)
             } else {
@@ -220,7 +222,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return validConfig
     }
 
-    private fun getCustomSizes(adSizes: ArrayList<AdSize>, sizeOptions: List<SDKConfig.Size>): List<AdSize> {
+    private fun getCustomSizes(adSizes: ArrayList<AdSize>, sizeOptions: List<SDKConfig.Size>): ArrayList<AdSize> {
         val sizes = ArrayList<AdSize>()
         adSizes.forEach {
             val lookingWidth = if (it.width != 0) it.width.toString() else "ALL"
@@ -270,6 +272,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             validCountryConfig.minViewRtb?.let { minViewRtb = it }
             validCountryConfig.fallback?.let { fallback = it }
             validCountryConfig.geoEdge?.let { geoEdge = it }
+            validCountryConfig.nativeFallback?.let { nativeFallback = it }
         }
         countrySetup = Triple(countrySetup.first, true, countrySetup.third)
         view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
@@ -297,16 +300,25 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    fun adFailedToLoad(isPublisherLoad: Boolean): Boolean {
-        setCountryConfig()
-        view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
-        view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
-        if (bannerConfig.unFilled?.status == 1) {
-            startUnfilledRefreshCounter()
+    fun adFailedToLoad(isPublisherLoad: Boolean, recalled: Boolean = false): Boolean {
+        if (!recalled) {
+            setCountryConfig()
+            view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
+            view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
+        }
+
+        if (shouldBeActive) {
             if (isPublisherLoad) {
-                refresh(unfilled = true)
-                return true
+                return if (bannerConfig.unFilled?.status == 1) {
+                    startUnfilledRefreshCounter()
+                    refresh(unfilled = true)
+                    true
+                } else {
+                    false
+                }
+
             } else {
+                startUnfilledRefreshCounter()
                 if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
                     bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
                     Handler(Looper.getMainLooper()).postDelayed({
@@ -432,7 +444,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         val currentTimeStamp = Date().time
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
-            bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes)
+            bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes.apply {
+                if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
+                    add(AdSize.FLUID)
+                }
+            })
             loadAd(active, unfilled)
         }
 
@@ -525,11 +541,19 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkOverride(): AdManagerAdRequest? {
         if (bannerConfig.isNewUnit && bannerConfig.newUnit?.status == 1) {
-            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = false, newUnit = true), bannerConfig.adSizes)
+            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = false, newUnit = true), bannerConfig.adSizes.apply {
+                if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
+                    add(AdSize.FLUID)
+                }
+            })
             view.log { "checkOverride: new Unit" }
             return createRequest(1).getAdRequest()
         } else if (bannerConfig.hijack?.status == 1) {
-            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes)
+            bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes.apply {
+                if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
+                    add(AdSize.FLUID)
+                }
+            })
             view.log { "checkOverride: hijack" }
             return createRequest(1, hijacked = true).getAdRequest()
         }
@@ -549,7 +573,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             view.log { "Fetch Demand with firstlook:  $firstLook and placement:  ${Gson().toJson(bannerConfig.placement)}" }
             bannerConfig.placement?.let {
                 if (bannerConfig.adSizes.isNotEmpty()) {
-                    val totalSizes = (bannerConfig.adSizes as ArrayList<AdSize>)
+                    val totalSizes = bannerConfig.adSizes
                     val firstAdSize = totalSizes[0]
                     val formatNeeded = bannerConfig.format
                     val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
@@ -650,6 +674,23 @@ internal class BannerManager(private val context: Context, private val bannerLis
             return biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)
         } else {
             return false
+        }
+    }
+
+    private fun ifNativePossible(): Boolean {
+        return if (bannerConfig.nativeFallback != 1) {
+            false
+        } else {
+            var maxArea: Int
+            var biggestPubSize: AdSize? = null
+            maxArea = 0
+            pubAdSizes.forEach {
+                if (maxArea < (it.width * it.height)) {
+                    biggestPubSize = it
+                    maxArea = (it.width * it.height)
+                }
+            }
+            (biggestPubSize != null && biggestPubSize!!.height > 120 && biggestPubSize!!.width > 120)
         }
     }
 }
