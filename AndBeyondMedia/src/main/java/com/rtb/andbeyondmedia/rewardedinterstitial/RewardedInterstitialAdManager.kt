@@ -168,9 +168,8 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
         } else {
             try {
                 val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-                workerData?.observeForever(object : Observer<WorkInfo> {
-                    @Suppress("UNNECESSARY_SAFE_CALL")
-                    override fun onChanged(value: WorkInfo) {
+                workerData?.observeForever(object : Observer<WorkInfo?> {
+                    override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
                             sdkConfig = storeService.config

@@ -147,8 +147,8 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         } else {
             try {
                 val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-                workerData?.observeForever(object : Observer<WorkInfo> {
-                    override fun onChanged(value: WorkInfo) {
+                workerData?.observeForever(object : Observer<WorkInfo?> {
+                    override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
                             sdkConfig = storeService.config
