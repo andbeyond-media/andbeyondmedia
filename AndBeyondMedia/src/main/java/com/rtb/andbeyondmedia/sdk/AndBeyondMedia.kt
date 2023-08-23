@@ -10,6 +10,8 @@ import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListene
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
+import io.sentry.Hint
+import io.sentry.Sentry
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -31,6 +33,7 @@ object AndBeyondMedia {
     internal var specialTag: String? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
+        Thread.setDefaultUncaughtExceptionHandler(CrashReporter(context, Thread.getDefaultUncaughtExceptionHandler()))
         this.logEnabled = logsEnabled
         fetchConfig(context)
     }
@@ -286,4 +289,13 @@ internal class StoreService(private val prefs: SharedPreferences) {
         set(value) = prefs.edit().apply {
             value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
         }.apply()
+}
+
+internal class CrashReporter(private val context: Context, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+    override fun uncaughtException(thread: Thread, exception: Throwable) {
+        Sentry.captureException(exception, Hint().apply {
+            set("App", context.packageName)
+        })
+    }
+
 }
