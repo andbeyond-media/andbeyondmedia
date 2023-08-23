@@ -7,7 +7,7 @@
     android:fillViewport="true"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    tools:context=".ScrollingActivity">
+    tools:context="com.rtb.andbeyondtest.ScrollingActivity">
 
 
     <androidx.recyclerview.widget.RecyclerView

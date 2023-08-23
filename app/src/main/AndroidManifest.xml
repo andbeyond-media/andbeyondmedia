@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
-        android:name=".ThisApplication"
+        android:name="com.rtb.andbeyondtest.ThisApplication"
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
@@ -13,14 +13,14 @@
         android:theme="@style/Theme.AndBeyondMedia"
         tools:ignore="DataExtractionRules">
         <activity
-            android:name=".ScrollingActivity"
+            android:name="com.rtb.andbeyondtest.ScrollingActivity"
             android:exported="true" />
         <activity
-            android:name=".GAMActivity"
+            android:name="com.rtb.andbeyondtest.GAMActivity"
             android:exported="true"
             android:hardwareAccelerated="true" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.rtb.andbeyondtest.MainActivity"
             android:configChanges="orientation|screenSize"
             android:exported="true"
             android:hardwareAccelerated="true">
@@ -34,10 +34,6 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
-        <!-- Required: set your sentry.io project identifier (DSN) -->
-        <meta-data
-            android:name="io.sentry.dsn"
-            android:value="https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032" />
     </application>
 
 </manifest>

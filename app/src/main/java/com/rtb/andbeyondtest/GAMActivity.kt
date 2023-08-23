@@ -1,10 +1,10 @@
-package com.rtb.andbeyondmedia
+package com.rtb.andbeyondtest
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
-import com.rtb.andbeyondmedia.databinding.ActivityGamaactivityBinding
+import com.rtb.andbeyondtest.databinding.ActivityGamaactivityBinding
 
 class GAMActivity : AppCompatActivity() {
 

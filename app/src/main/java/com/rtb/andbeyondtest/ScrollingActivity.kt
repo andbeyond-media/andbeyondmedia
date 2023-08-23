@@ -1,11 +1,11 @@
-package com.rtb.andbeyondmedia
+package com.rtb.andbeyondtest
 
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.rtb.andbeyondmedia.common.AdRequest
-import com.rtb.andbeyondmedia.databinding.ActivityScrollingBinding
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
+import com.rtb.andbeyondtest.databinding.ActivityScrollingBinding
 
 class ScrollingActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScrollingBinding

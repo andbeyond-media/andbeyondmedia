@@ -1,4 +1,4 @@
-package com.rtb.andbeyondmedia
+package com.rtb.andbeyondtest
 
 import android.app.Activity
 import android.app.Application

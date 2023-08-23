@@ -9,9 +9,13 @@ import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
+import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import io.sentry.Hint
 import io.sentry.Sentry
+import io.sentry.SentryEvent
+import io.sentry.SentryOptions
+import io.sentry.android.core.SentryAndroid
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -33,9 +37,25 @@ object AndBeyondMedia {
     internal var specialTag: String? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
-        Thread.setDefaultUncaughtExceptionHandler(CrashReporter(context, Thread.getDefaultUncaughtExceptionHandler()))
+        attachEventHandler(context)
         this.logEnabled = logsEnabled
         fetchConfig(context)
+    }
+
+    private fun attachEventHandler(context: Context) {
+        Thread.setDefaultUncaughtExceptionHandler(EventHandler(Thread.getDefaultUncaughtExceptionHandler()))
+        SentryAndroid.init(context) { options ->
+            options.environment = context.packageName
+            options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
+            options.beforeSend = SentryOptions.BeforeSendCallback { event: SentryEvent, _: Hint ->
+                if (event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME) == true) {
+                    event.dist = BuildConfig.ADAPTER_VERSION
+                    event
+                } else {
+                    null
+                }
+            }
+        }
     }
 
     internal fun getStoreService(context: Context): StoreService {
@@ -291,11 +311,13 @@ internal class StoreService(private val prefs: SharedPreferences) {
         }.apply()
 }
 
-internal class CrashReporter(private val context: Context, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+internal class EventHandler(private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, exception: Throwable) {
-        Sentry.captureException(exception, Hint().apply {
-            set("App", context.packageName)
-        })
+        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME)) {
+            Sentry.captureException(exception)
+        } else {
+            defaultHandler?.uncaughtException(thread, exception)
+        }
     }
 
 }

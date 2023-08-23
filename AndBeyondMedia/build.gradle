@@ -13,7 +13,7 @@ android {
         targetSdk 32
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
-        buildConfigField("String", "ADAPTER_VERSION", "\"1.1.6\"")
+        buildConfigField("String", "ADAPTER_VERSION", "\"1.2.0\"")
     }
 
     buildTypes {
@@ -64,7 +64,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.andbeyond-media'
             artifactId = 'andbeyondmedia'
-            version = '1.1.8'
+            version = '1.2.0'
 
             afterEvaluate {
                 from components.release
