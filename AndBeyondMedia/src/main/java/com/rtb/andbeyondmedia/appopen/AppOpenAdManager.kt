@@ -157,7 +157,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }

@@ -12,6 +12,8 @@ internal data class SDKConfig(
         val affiliatedId: Long? = null,
         @SerializedName("hb_format")
         val hbFormat: String? = null,
+        @SerializedName("event_handling")
+        val eventHandling: Int? = null,
         @SerializedName("refetch")
         val refetch: Long? = null,
         @SerializedName("country_status")

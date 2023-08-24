@@ -107,7 +107,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     }
                 }
             })
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.message
         }
     }
@@ -131,7 +131,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }

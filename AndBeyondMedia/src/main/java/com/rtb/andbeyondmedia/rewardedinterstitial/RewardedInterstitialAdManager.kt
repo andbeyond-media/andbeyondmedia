@@ -122,7 +122,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                     }
                 })
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -178,7 +178,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }

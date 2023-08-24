@@ -123,7 +123,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     }
                 })
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -179,7 +179,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }

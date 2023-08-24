@@ -213,7 +213,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                     }
                 })
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -237,7 +237,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }
@@ -333,7 +333,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         try {
             val tracker = NativeEventTracker(NativeEventTracker.EVENT_TYPE.IMPRESSION, methods)
             adUnit?.addEventTracker(tracker)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }

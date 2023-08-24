@@ -148,7 +148,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     return false
                 }
             }).into(ad)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
         }
 
@@ -262,14 +262,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
                 false
             }
             if (!retryStatus) {
                 retryStatus = try {
                     bannerManager.checkFallback(isRefreshLoaded)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     e.printStackTrace()
                     false
                 }

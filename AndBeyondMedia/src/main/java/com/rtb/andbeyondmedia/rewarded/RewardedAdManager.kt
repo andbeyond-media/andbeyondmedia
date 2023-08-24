@@ -120,7 +120,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                     }
                 })
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -176,7 +176,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                         }
                     }
                 })
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 callback(false)
             }
         }

@@ -13,7 +13,7 @@ fun Context.connectionAvailable(): Boolean? {
         val network: NetworkInfo? = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE)
         internetAvailable = wifi != null && wifi.isConnected || network != null && network.isConnected
         internetAvailable
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
         null
     }
 }

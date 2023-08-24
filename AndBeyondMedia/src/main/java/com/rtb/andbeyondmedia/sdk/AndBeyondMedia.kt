@@ -42,14 +42,29 @@ object AndBeyondMedia {
         fetchConfig(context)
     }
 
+    internal fun ifHandleEvent(max: Int): Boolean {
+        return try {
+            val number = (1..100).random()
+            number in 1..max
+        } catch (e: Throwable) {
+            false
+        }
+
+    }
+
     private fun attachEventHandler(context: Context) {
-        Thread.setDefaultUncaughtExceptionHandler(EventHandler(Thread.getDefaultUncaughtExceptionHandler()))
+        val storeService = getStoreService(context)
+        Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
         SentryAndroid.init(context) { options ->
             options.environment = context.packageName
             options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
+            val ifHandling = ifHandleEvent(storeService.config?.eventHandling ?: 0)
             options.beforeSend = SentryOptions.BeforeSendCallback { event: SentryEvent, _: Hint ->
-                if (event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME) == true) {
+                if (event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME) == true || ifHandling) {
                     event.dist = BuildConfig.ADAPTER_VERSION
+                    if (ifHandling) {
+                        event.tags = mapOf("is_publisher_app" to "yes")
+                    }
                     event
                 } else {
                     null
@@ -131,7 +146,7 @@ object AndBeyondMedia {
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             SDKManager.initialize(context)
         }
     }
@@ -165,7 +180,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
                     Result.success()
                 } ?: Result.failure()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Logger.ERROR.log(msg = e.message ?: "")
             storeService.config?.let {
                 Result.success()
@@ -311,9 +326,9 @@ internal class StoreService(private val prefs: SharedPreferences) {
         }.apply()
 }
 
-internal class EventHandler(private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+internal class EventHandler(private val storeService: StoreService, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, exception: Throwable) {
-        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME)) {
+        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME) || AndBeyondMedia.ifHandleEvent(storeService.config?.eventHandling ?: 0)) {
             Sentry.captureException(exception)
         } else {
             defaultHandler?.uncaughtException(thread, exception)
