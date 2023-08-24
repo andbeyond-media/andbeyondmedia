@@ -27,6 +27,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.QueryMap
 import java.util.concurrent.TimeUnit
+import kotlin.system.exitProcess
 
 object AndBeyondMedia {
     private var storeService: StoreService? = null
@@ -330,6 +331,7 @@ internal class EventHandler(private val storeService: StoreService, private val 
     override fun uncaughtException(thread: Thread, exception: Throwable) {
         if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME) || AndBeyondMedia.ifHandleEvent(storeService.config?.eventHandling ?: 0)) {
             Sentry.captureException(exception)
+            exitProcess(0)
         } else {
             defaultHandler?.uncaughtException(thread, exception)
         }

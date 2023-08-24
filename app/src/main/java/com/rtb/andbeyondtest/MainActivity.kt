@@ -12,7 +12,7 @@ import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialAd
-import com.rtb.andbeyondmedia.native.NativeAdManager
+import com.rtb.andbeyondmedia.nativeformat.NativeAdManager
 import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.sdk.BannerAdListener

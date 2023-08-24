@@ -13,14 +13,14 @@
         android:theme="@style/Theme.AndBeyondMedia"
         tools:ignore="DataExtractionRules">
         <activity
-            android:name="com.rtb.andbeyondtest.ScrollingActivity"
+            android:name=".ScrollingActivity"
             android:exported="true" />
         <activity
-            android:name="com.rtb.andbeyondtest.GAMActivity"
+            android:name=".GAMActivity"
             android:exported="true"
             android:hardwareAccelerated="true" />
         <activity
-            android:name="com.rtb.andbeyondtest.MainActivity"
+            android:name=".MainActivity"
             android:configChanges="orientation|screenSize"
             android:exported="true"
             android:hardwareAccelerated="true">

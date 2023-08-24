@@ -1,4 +1,4 @@
-package com.rtb.andbeyondmedia.native
+package com.rtb.andbeyondmedia.nativeformat
 
 import android.content.Context
 import android.os.Handler
