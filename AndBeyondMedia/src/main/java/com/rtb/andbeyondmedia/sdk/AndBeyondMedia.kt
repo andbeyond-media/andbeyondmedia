@@ -11,7 +11,8 @@ import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
-import io.sentry.Hint
+import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
+import com.rtb.andbeyondmedia.sdk.EventHelper.shouldHandle
 import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
@@ -41,37 +42,6 @@ object AndBeyondMedia {
         attachEventHandler(context)
         this.logEnabled = logsEnabled
         fetchConfig(context)
-    }
-
-    internal fun ifHandleEvent(max: Int): Boolean {
-        return try {
-            val number = (1..100).random()
-            number in 1..max
-        } catch (e: Throwable) {
-            false
-        }
-
-    }
-
-    private fun attachEventHandler(context: Context) {
-        val storeService = getStoreService(context)
-        Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
-        SentryAndroid.init(context) { options ->
-            options.environment = context.packageName
-            options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
-            val ifHandling = ifHandleEvent(storeService.config?.eventHandling ?: 0)
-            options.beforeSend = SentryOptions.BeforeSendCallback { event: SentryEvent, _: Hint ->
-                if (event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME) == true || ifHandling) {
-                    event.dist = BuildConfig.ADAPTER_VERSION
-                    if (ifHandling) {
-                        event.tags = mapOf("is_publisher_app" to "yes")
-                    }
-                    event
-                } else {
-                    null
-                }
-            }
-        }
     }
 
     internal fun getStoreService(context: Context): StoreService {
@@ -164,6 +134,54 @@ object AndBeyondMedia {
         } catch (e: Throwable) {
             e.stackTrace
         }
+    }
+}
+
+internal object EventHelper {
+
+    fun attachEventHandler(context: Context) {
+        val storeService = AndBeyondMedia.getStoreService(context)
+        Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
+        SentryAndroid.init(context) { options ->
+            options.environment = context.packageName
+            options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
+            options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
+        }
+    }
+
+    private fun getProcessedEvent(storeService: StoreService, event: SentryEvent): SentryEvent? {
+        val sentEvent = if ((event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) == true
+                        && shouldHandle(storeService.config?.events?.self ?: 100)) || (event.throwable?.stackTraceToString()?.contains("OutOfMemoryError", true) == true
+                        && shouldHandle(storeService.config?.events?.oom ?: 100))) {
+            event
+        } else {
+            if (shouldHandle(storeService.config?.events?.other ?: 0)) {
+                event
+            } else {
+                null
+            }
+        }
+        sentEvent?.setExtra("RAW_TRACE", event.throwable?.stackTraceToString() ?: "")
+        sentEvent?.dist = BuildConfig.ADAPTER_VERSION
+        sentEvent?.tags = hashMapOf<String?, String?>().apply {
+            if(event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) == true){
+                put("SDK_ISSUE", "yes")
+            }else{
+                put("PUBLISHER_ISSUE", "Yes")
+            }
+        }
+
+        return sentEvent
+    }
+
+    fun shouldHandle(max: Int): Boolean {
+        return try {
+            val number = (1..100).random()
+            number in 1..max
+        } catch (e: Throwable) {
+            false
+        }
+
     }
 }
 
@@ -329,11 +347,20 @@ internal class StoreService(private val prefs: SharedPreferences) {
 
 internal class EventHandler(private val storeService: StoreService, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, exception: Throwable) {
-        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME) || AndBeyondMedia.ifHandleEvent(storeService.config?.eventHandling ?: 0)) {
+
+        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) && shouldHandle(storeService.config?.events?.self ?: 100)) {
+            Sentry.captureException(exception)
+            exitProcess(0)
+        } else if (exception.stackTraceToString().contains("OutOfMemoryError", true) && shouldHandle(storeService.config?.events?.oom ?: 100)) {
             Sentry.captureException(exception)
             exitProcess(0)
         } else {
-            defaultHandler?.uncaughtException(thread, exception)
+            if (shouldHandle(storeService.config?.events?.other ?: 0)) {
+                Sentry.captureException(exception)
+                exitProcess(0)
+            } else {
+                defaultHandler?.uncaughtException(thread, exception)
+            }
         }
     }
 

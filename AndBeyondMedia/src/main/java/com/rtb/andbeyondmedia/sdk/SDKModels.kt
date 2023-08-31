@@ -12,8 +12,8 @@ internal data class SDKConfig(
         val affiliatedId: Long? = null,
         @SerializedName("hb_format")
         val hbFormat: String? = null,
-        @SerializedName("event_handling")
-        val eventHandling: Int? = null,
+        @SerializedName("events")
+        val events: Events? = null,
         @SerializedName("refetch")
         val refetch: Long? = null,
         @SerializedName("country_status")
@@ -65,6 +65,16 @@ internal data class SDKConfig(
         @SerializedName("native_fallback")
         val nativeFallback: Int? = null
 ) {
+
+    @Keep
+    data class Events(
+            @SerializedName("self")
+            val self :Int? = null,
+            @SerializedName("other")
+            val other :Int? = null,
+            @SerializedName("oom")
+            val oom :Int? = null,
+    )
 
     @Keep
     fun getBlockList() = arrayListOf<String>().apply {
