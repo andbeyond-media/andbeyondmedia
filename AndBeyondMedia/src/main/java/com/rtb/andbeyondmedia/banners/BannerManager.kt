@@ -7,6 +7,13 @@ import android.os.Looper
 import android.view.View
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
+import com.amazon.device.ads.AdError
+import com.amazon.device.ads.AdRegistration
+import com.amazon.device.ads.DTBAdCallback
+import com.amazon.device.ads.DTBAdRequest
+import com.amazon.device.ads.DTBAdResponse
+import com.amazon.device.ads.DTBAdSize
+import com.amazon.device.ads.DTBAdUtil
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdapterResponseInfo
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
@@ -30,6 +37,7 @@ import org.prebid.mobile.api.data.AdUnitFormat
 import java.util.Date
 import java.util.EnumSet
 import kotlin.math.ceil
+
 
 internal class BannerManager(private val context: Context, private val bannerListener: BannerManagerListener, private val view: View? = null) {
 
@@ -303,8 +311,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adFailedToLoad(isPublisherLoad: Boolean, recalled: Boolean = false): Boolean {
         if (!recalled) {
             setCountryConfig()
-            view.log { "AdFailed & Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)}" }
-            view.log { "AdFailed & Retry Config: ${Gson().toJson(bannerConfig.retryConfig)}" }
+            view.log { "Failed with Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)} && Retry config : ${Gson().toJson(bannerConfig.retryConfig)}" }
         }
 
         if (shouldBeActive) {
@@ -341,7 +348,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    fun adLoaded(firstLook: Boolean, loadedAdapter: AdapterResponseInfo?) {
+    fun adLoaded(firstLook: Boolean, loadedUnit: String, loadedAdapter: AdapterResponseInfo?) {
         adImpressed()
         setCountryConfig()
         if (sdkConfig?.switch == 1 && !refreshBlocked) {
@@ -359,8 +366,13 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
-                    && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))) {
+                    && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))
+                    && !ifUnitOnHold(loadedUnit)) {
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
+            } else {
+                view.log { "Refresh blocked" }
+                passiveTimeCounter?.cancel()
+                activeTimeCounter?.cancel()
             }
         }
     }
@@ -371,7 +383,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false, timers: Int? = null) {
-        view.log { "startRefreshing: $resetVisibleTime $isPublisherLoad $timers" }
+        view.log { "startRefreshing: resetVisibleTime: $resetVisibleTime isPublisherLoad: $isPublisherLoad timers: $timers" }
         if (resetVisibleTime) {
             bannerConfig.isVisibleFor = 0
         }
@@ -577,33 +589,102 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: () -> Unit) {
-        if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
-            view.log { "Fetch Demand with firstlook:  $firstLook and placement:  ${Gson().toJson(bannerConfig.placement)}" }
-            bannerConfig.placement?.let {
-                if (bannerConfig.adSizes.isNotEmpty()) {
-                    val totalSizes = bannerConfig.adSizes
-                    val firstAdSize = totalSizes[0]
-                    val formatNeeded = bannerConfig.format
-                    val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
-                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height)
-                    } else if (formatNeeded.contains("video", true) && !formatNeeded.contains("html", true)) {
-                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO)).apply {
-                            videoParameters = configureVideoParameters()
-                        }
-                    } else {
-                        BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO, AdUnitFormat.BANNER)).apply {
-                            videoParameters = configureVideoParameters()
-                        }
-                    }
-                    totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
-                    adUnit.fetchDemand(adRequest) { callback() }
-                }
-            } ?: callback()
-
+    fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: (AdManagerAdRequest) -> Unit) {
+        val prebidAvailable = if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
+            bannerConfig.placement != null && bannerConfig.adSizes.isNotEmpty()
         } else {
-            view.log { "Fetch Demand : without Prebid" }
-            callback()
+            false
+        }
+
+        val apsAvailable = (firstLook && sdkConfig?.aps?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.aps?.other == 1)
+
+
+        fun prebid(apsRequestBuilder: AdManagerAdRequest.Builder? = null) = bannerConfig.placement?.let {
+            val totalSizes = bannerConfig.adSizes
+            val firstAdSize = totalSizes[0]
+            val formatNeeded = bannerConfig.format
+            val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
+                BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height)
+            } else if (formatNeeded.contains("video", true) && !formatNeeded.contains("html", true)) {
+                BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO)).apply {
+                    videoParameters = configureVideoParameters()
+                }
+            } else {
+                BannerAdUnit(if (firstLook) it.firstLook ?: "" else it.other ?: "", firstAdSize.width, firstAdSize.height, EnumSet.of(AdUnitFormat.VIDEO, AdUnitFormat.BANNER)).apply {
+                    videoParameters = configureVideoParameters()
+                }
+            }
+            totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
+            val finalRequest = apsRequestBuilder?.let { apsRequestBuilder ->
+                adRequest.customTargeting.keySet().forEach { key ->
+                    apsRequestBuilder.addCustomTargeting(key, adRequest.customTargeting.getString(key, ""))
+                }
+                apsRequestBuilder.build()
+            } ?: adRequest
+
+            adUnit.fetchDemand(finalRequest) {
+                view.log { "Demand fetched aps : ${apsRequestBuilder != null} && prebid : completed" }
+                callback(finalRequest)
+            }
+        }
+
+        fun aps(wait: Boolean) {
+            var actionTaken = false
+            val matchingSlots = arrayListOf<DTBAdSize>()
+            bannerConfig.adSizes.forEach { size ->
+                sdkConfig?.aps?.slots?.filter { slot -> slot.height?.toIntOrNull() == size.height && slot.width?.toIntOrNull() == size.width }?.forEach {
+                    matchingSlots.add(DTBAdSize(it.width?.toIntOrNull() ?: 0, it.height?.toIntOrNull() ?: 0, it.slotId ?: ""))
+                }
+            }
+            val loader = DTBAdRequest()
+            val apsCallback = object : DTBAdCallback {
+                override fun onFailure(adError: AdError) {
+                    if (actionTaken) return
+                    actionTaken = true
+                    if (wait) {
+                        prebid(null)
+                    } else {
+                        callback(adRequest)
+                    }
+                }
+
+                override fun onSuccess(dtbAdResponse: DTBAdResponse) {
+                    if (actionTaken) return
+                    actionTaken = true
+                    if (wait) {
+                        prebid(DTBAdUtil.INSTANCE.createAdManagerAdRequestBuilder(dtbAdResponse))
+                    } else {
+                        val apsRequest = DTBAdUtil.INSTANCE.createAdManagerAdRequestBuilder(dtbAdResponse)
+                        adRequest.customTargeting.keySet().forEach { key ->
+                            apsRequest.addCustomTargeting(key, adRequest.customTargeting.getString(key, ""))
+                        }
+                        callback(apsRequest.build())
+                    }
+                }
+            }
+
+            if (matchingSlots.isEmpty() || !AdRegistration.isInitialized()) {
+                apsCallback.onFailure(AdError(AdError.ErrorCode.NO_FILL, "error"))
+                return
+            }
+            loader.setSizes(*matchingSlots.toTypedArray())
+            loader.loadAd(apsCallback)
+            sdkConfig?.aps?.timeout?.let {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    apsCallback.onFailure(AdError(AdError.ErrorCode.NO_FILL, "error"))
+                }, it.toLongOrNull() ?: 1000)
+            }
+        }
+
+        view.log { "Fetch Demand with aps : $apsAvailable and with prebid : $prebidAvailable" }
+        if (apsAvailable && prebidAvailable) {
+            aps(true)
+        } else if (apsAvailable) {
+            aps(false)
+        } else if (prebidAvailable) {
+            prebid()
+        } else {
+            callback(adRequest)
         }
     }
 
@@ -701,5 +782,13 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
             (biggestPubSize != null && biggestPubSize!!.height > 120 && biggestPubSize!!.width > 120)
         }
+    }
+
+    private fun ifUnitOnHold(adUnit: String): Boolean {
+        val hold = sdkConfig?.heldUnits?.any { adUnit.contains(it, false) } == true || sdkConfig?.heldUnits?.any { it.contains("all", true) } == true
+        if (hold) {
+            view.log { "Blocking refresh on : $adUnit" }
+        }
+        return hold
     }
 }

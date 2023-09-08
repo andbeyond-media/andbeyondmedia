@@ -106,7 +106,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
-        if(this::adView.isInitialized) adView.destroy()
+        if (this::adView.isInitialized) adView.destroy()
         adView = AdManagerAdView(mContext)
         adView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         if (adSizes.none { it == AdSize.FLUID }) {
@@ -197,8 +197,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         fun load() {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${Gson().toJson(adRequest.customTargeting)}" }
-                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting["retry"] != "1"
-                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
+                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
             }
         }
         if (firstLook) {
@@ -256,7 +256,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
-            log { "Ad Failed with error : $p0" }
+            log { "Adunit $currentAdUnit Failed with error : $p0" }
             val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
@@ -294,7 +294,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdLoaded()
             }
-            bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
+            bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
             }

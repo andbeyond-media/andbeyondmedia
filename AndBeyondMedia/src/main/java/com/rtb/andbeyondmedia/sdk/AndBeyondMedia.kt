@@ -3,6 +3,9 @@ package com.rtb.andbeyondmedia.sdk
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.work.*
+import com.amazon.device.ads.AdRegistration
+import com.amazon.device.ads.DTBAdNetwork
+import com.amazon.device.ads.DTBAdNetworkInfo
 import com.appharbr.sdk.configuration.AHSdkConfiguration
 import com.appharbr.sdk.engine.AppHarbr
 import com.appharbr.sdk.engine.InitializationFailureReason
@@ -29,6 +32,7 @@ import retrofit2.http.GET
 import retrofit2.http.QueryMap
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
+
 
 object AndBeyondMedia {
     private var storeService: StoreService? = null
@@ -164,9 +168,9 @@ internal object EventHelper {
         sentEvent?.setExtra("RAW_TRACE", event.throwable?.stackTraceToString() ?: "")
         sentEvent?.dist = BuildConfig.ADAPTER_VERSION
         sentEvent?.tags = hashMapOf<String?, String?>().apply {
-            if(event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) == true){
+            if (event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) == true) {
                 put("SDK_ISSUE", "yes")
-            }else{
+            } else {
                 put("PUBLISHER_ISSUE", "Yes")
             }
         }
@@ -252,6 +256,7 @@ internal object SDKManager {
         if (config.switch != 1) return
         initializePrebid(context, config.prebid)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
+        initializeAPS(context, config.aps)
     }
 
     private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
@@ -306,6 +311,14 @@ internal object SDKManager {
             }
 
         })
+    }
+
+    private fun initializeAPS(context: Context, aps: SDKConfig.Aps?) {
+        if (aps?.appKey.isNullOrEmpty()) return
+        AdRegistration.getInstance(aps?.appKey ?: "", context)
+        AdRegistration.setAdNetworkInfo(DTBAdNetworkInfo(DTBAdNetwork.GOOGLE_AD_MANAGER))
+        AdRegistration.useGeoLocation(aps?.location == null || aps.location == 1)
+        AdRegistration.enableTesting(true) // to be removed
     }
 }
 

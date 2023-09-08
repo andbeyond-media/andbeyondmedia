@@ -1,6 +1,7 @@
 package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
+import com.amazon.aps.ads.Aps
 import com.google.gson.annotations.SerializedName
 import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
@@ -24,6 +25,8 @@ internal data class SDKConfig(
         val infoConfig: InfoConfig? = null,
         @SerializedName("prebid")
         val prebid: Prebid? = null,
+        @SerializedName("aps")
+        val aps: Aps? = null,
         @SerializedName("geoedge")
         val geoEdge: GeoEdge? = null,
         @SerializedName("network_block")
@@ -52,6 +55,8 @@ internal data class SDKConfig(
         val refreshConfig: List<RefreshConfig>? = null,
         @SerializedName("block")
         private val block: List<List<String>?>? = null,
+        @SerializedName("halt")
+        val heldUnits: ArrayList<String>? = null,
         @SerializedName("hijack")
         val hijackConfig: LoadConfigs? = null,
         @SerializedName("unfilled")
@@ -69,11 +74,11 @@ internal data class SDKConfig(
     @Keep
     data class Events(
             @SerializedName("self")
-            val self :Int? = null,
+            val self: Int? = null,
             @SerializedName("other")
-            val other :Int? = null,
+            val other: Int? = null,
             @SerializedName("oom")
-            val oom :Int? = null,
+            val oom: Int? = null,
     )
 
     @Keep
@@ -140,6 +145,31 @@ internal data class SDKConfig(
                 val key: String? = null,
                 @SerializedName("value")
                 val value: String? = null
+        )
+    }
+
+    data class Aps(
+            @SerializedName("firstlook")
+            val firstLook: Int? = null,
+            @SerializedName("other")
+            val other: Int? = null,
+            @SerializedName("timeout")
+            val timeout: String? = null,
+            @SerializedName("app_key")
+            val appKey: String? = null,
+            @SerializedName("location")
+            val location: Int? = null,
+            @SerializedName("slots")
+            val slots: List<Slot>? = null
+    ) {
+        @Keep
+        data class Slot(
+                @SerializedName("width")
+                var width: String? = null,
+                @SerializedName("height")
+                var height: String? = null,
+                @SerializedName("slot_id")
+                val slotId: String? = null
         )
     }
 
@@ -306,7 +336,7 @@ data class Fallback(
             @SerializedName("image")
             val image: String? = null,
             @SerializedName("url")
-            val url: String? = null
+            val url: String? = null,
     )
 }
 
