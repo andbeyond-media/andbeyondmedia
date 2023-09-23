@@ -1,5 +1,6 @@
 package com.rtb.andbeyondmedia.banners
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
@@ -126,9 +127,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         log { "attachAdView : $adUnitId" }
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     override fun attachFallback(fallbackBanner: Fallback.Banner) {
         val imageView = ImageView(context)
-        val webView = WebView(context)
+        val webView = WebView(context).apply {
+            settings.javaScriptEnabled = true
+        }
         imageView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
         webView.layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
         imageView.scaleType = ImageView.ScaleType.FIT_XY
@@ -172,6 +176,10 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 e.printStackTrace()
             }
             adListener.onAdClicked()
+        }
+        bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+            Glide.with(ad).load(it.first).into(ad)
+            webView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
         }
     }
 

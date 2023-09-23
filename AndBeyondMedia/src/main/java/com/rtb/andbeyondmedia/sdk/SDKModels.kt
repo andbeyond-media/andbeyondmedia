@@ -1,9 +1,7 @@
 package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
-import com.amazon.aps.ads.Aps
 import com.google.gson.annotations.SerializedName
-import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 @Keep
 internal data class SDKConfig(
@@ -27,6 +25,8 @@ internal data class SDKConfig(
         val prebid: Prebid? = null,
         @SerializedName("aps")
         val aps: Aps? = null,
+        @SerializedName("open_rtb")
+        val openRTb: OpenRTBConfig? = null,
         @SerializedName("geoedge")
         val geoEdge: GeoEdge? = null,
         @SerializedName("network_block")
@@ -190,6 +190,29 @@ internal data class SDKConfig(
     )
 
     @Keep
+    data class OpenRTBConfig(
+            @SerializedName("percentage")
+            val percentage: Int? = null,
+            @SerializedName("timeout")
+            val timeout: Int? = null,
+            @SerializedName("url")
+            val url: String? = null,
+            @SerializedName("headers")
+            val headers: List<KeyValuePair>? = null,
+            @SerializedName("request")
+            val request: String? = null
+    ) {
+        @Keep
+        data class KeyValuePair(
+                @SerializedName("key")
+                val key: String? = null,
+                @SerializedName("value")
+                val value: String? = null
+        )
+    }
+
+
+    @Keep
     data class RefreshConfig(
             @SerializedName("type")
             val type: String? = null,
@@ -348,5 +371,10 @@ data class Fallback(
 @Keep
 data class CountryModel(
         @SerializedName("countryCode", alternate = ["country"])
-        val countryCode: String? = null
-)
+        val countryCode: String? = null,
+        @SerializedName("latitude", alternate = ["lat"])
+        val latitude: Double? = null,
+        @SerializedName("longitude", alternate = ["lon"])
+        val longitude: Double? = null,
+
+        )

@@ -6,5 +6,8 @@
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">rtb-apac.andbeyond.media</domain>
+    </domain-config>
 </network-security-config>
