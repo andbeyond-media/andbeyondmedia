@@ -8,7 +8,6 @@ import android.view.View
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.amazon.device.ads.AdError
-import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdCallback
 import com.amazon.device.ads.DTBAdRequest
 import com.amazon.device.ads.DTBAdResponse
@@ -663,7 +662,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 }
             }
 
-            if (matchingSlots.isEmpty() || !AdRegistration.isInitialized()) {
+            if (matchingSlots.isEmpty()) {
                 apsCallback.onFailure(AdError(AdError.ErrorCode.NO_FILL, "error"))
                 return
             }

@@ -2,6 +2,8 @@ package com.rtb.andbeyondmedia.sdk
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import androidx.work.*
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
@@ -315,10 +317,16 @@ internal object SDKManager {
 
     private fun initializeAPS(context: Context, aps: SDKConfig.Aps?) {
         if (aps?.appKey.isNullOrEmpty()) return
-        AdRegistration.getInstance(aps?.appKey ?: "", context)
-        AdRegistration.setAdNetworkInfo(DTBAdNetworkInfo(DTBAdNetwork.GOOGLE_AD_MANAGER))
-        AdRegistration.useGeoLocation(aps?.location == null || aps.location == 1)
-        AdRegistration.enableTesting(true) // to be removed
+        fun init() {
+            AdRegistration.getInstance(aps?.appKey ?: "", context)
+            AdRegistration.setAdNetworkInfo(DTBAdNetworkInfo(DTBAdNetwork.GOOGLE_AD_MANAGER))
+            AdRegistration.useGeoLocation(aps?.location == null || aps.location == 1)
+        }
+        if (aps?.delay == null || aps.delay.toIntOrNull() == 0) {
+            init()
+        } else {
+            Handler(Looper.getMainLooper()).postDelayed({ init() }, aps.delay.toLongOrNull() ?: 1L)
+        }
     }
 }
 

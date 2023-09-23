@@ -155,6 +155,8 @@ internal data class SDKConfig(
             val other: Int? = null,
             @SerializedName("timeout")
             val timeout: String? = null,
+            @SerializedName("delay")
+            val delay: String? = null,
             @SerializedName("app_key")
             val appKey: String? = null,
             @SerializedName("location")
@@ -337,6 +339,8 @@ data class Fallback(
             val image: String? = null,
             @SerializedName("url")
             val url: String? = null,
+            @SerializedName("tag")
+            val tag: String? = null
     )
 }
 
