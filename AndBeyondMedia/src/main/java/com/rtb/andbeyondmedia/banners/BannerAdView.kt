@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.AttributeSet
+import android.webkit.WebView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -106,14 +107,18 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
-        if(this::adView.isInitialized) adView.destroy()
+        if (this::adView.isInitialized) adView.destroy()
         adView = AdManagerAdView(mContext)
         adView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         if (adSizes.none { it == AdSize.FLUID }) {
             currentAdSizes = adSizes
         }
         currentAdUnit = adUnitId
-        adView.setAdSizes(*adSizes.toTypedArray())
+        if (adSizes.size == 1) {
+            adView.setAdSize(adSizes.first())
+        } else {
+            adView.setAdSizes(*adSizes.toTypedArray())
+        }
         adView.adUnitId = adUnitId
         adView.adListener = adListener
         binding.root.removeAllViews()
@@ -123,27 +128,33 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     override fun attachFallback(fallbackBanner: Fallback.Banner) {
         val imageView = ImageView(context)
+        val webView = WebView(context)
         imageView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+        webView.layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
         imageView.scaleType = ImageView.ScaleType.FIT_XY
         binding.root.removeAllViews()
         binding.root.addView(imageView)
-        loadFallbackAd(imageView, fallbackBanner)
+        binding.root.addView(webView)
+        loadFallbackAd(imageView, webView, fallbackBanner)
     }
 
-    private fun loadFallbackAd(ad: ImageView, fallbackBanner: Fallback.Banner) {
+    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
         fun sendFailure(error: String) {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdFailedToLoad(error, false)
             }
         }
         try {
+            fallbackBanner.tag?.let {
+                webView.loadData(it, "text/html; charset=utf-8", "UTF-8")
+            }
             Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
-                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
+                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
                     sendFailure(e?.message ?: "")
                     return false
                 }
 
-                override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                override fun onResourceReady(resource: Drawable, model: Any, target: Target<Drawable>?, dataSource: DataSource, isFirstResource: Boolean): Boolean {
                     adListener.onAdLoaded()
                     adListener.onAdImpression()
                     return false
@@ -197,8 +208,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         fun load() {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${Gson().toJson(adRequest.customTargeting)}" }
-                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting["retry"] != "1"
-                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(adRequest) }
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
+                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
             }
         }
         if (firstLook) {
@@ -256,7 +267,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
-            log { "Ad Failed with error : $p0" }
+            log { "Adunit $currentAdUnit Failed with error : $p0" }
             val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
@@ -294,7 +305,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdLoaded()
             }
-            bannerManager.adLoaded(firstLook, adView.responseInfo?.loadedAdapterResponseInfo)
+            bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
                 firstLook = false
             }

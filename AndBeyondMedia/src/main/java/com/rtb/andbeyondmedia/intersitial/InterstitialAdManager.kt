@@ -5,6 +5,13 @@ import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
+import com.amazon.device.ads.AdError
+import com.amazon.device.ads.AdRegistration
+import com.amazon.device.ads.DTBAdCallback
+import com.amazon.device.ads.DTBAdRequest
+import com.amazon.device.ads.DTBAdResponse
+import com.amazon.device.ads.DTBAdSize
+import com.amazon.device.ads.DTBAdUtil
 import com.appharbr.sdk.engine.AdBlockReason
 import com.appharbr.sdk.engine.AdSdk
 import com.appharbr.sdk.engine.AppHarbr
@@ -82,8 +89,8 @@ internal class InterstitialAdManager(private val context: Activity, private val 
 
     private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
         otherUnit = adUnit != this.adUnit
-        fetchDemand(adRequest) {
-            AdManagerInterstitialAd.load(context, adUnit, adRequest, object : AdManagerInterstitialAdLoadCallback() {
+        fetchDemand(adRequest) { finalRequest ->
+            AdManagerInterstitialAd.load(context, adUnit, finalRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
                     interstitialConfig.retryConfig = sdkConfig?.retryConfig
                     addGeoEdge(interstitialAd, otherUnit)
@@ -221,9 +228,12 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
-    private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
-        if ((!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)) {
-            val formatNeeded = interstitialConfig.format
+    private fun fetchDemand(adRequest: AdManagerAdRequest, callback: (AdManagerAdRequest) -> Unit) {
+        val prebidAvailable = (!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)
+        val apsAvailable = (!otherUnit && sdkConfig?.aps?.firstLook == 1) || (otherUnit && sdkConfig?.aps?.other == 1)
+        val formatNeeded = interstitialConfig.format
+
+        fun prebid(apsRequestBuilder: AdManagerAdRequest.Builder? = null) {
             val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {
                 InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), 80, 60)
             } else if (formatNeeded.contains("video", true) && !formatNeeded.contains("html", true)) {
@@ -231,15 +241,86 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     videoParameters = configureVideoParameters()
                 }
             } else {
-                InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), EnumSet.of(AdUnitFormat.VIDEO, AdUnitFormat.VIDEO)).apply {
+                InterstitialAdUnit((if (otherUnit) interstitialConfig.placement?.other ?: 0 else interstitialConfig.placement?.firstLook ?: 0).toString(), EnumSet.of(AdUnitFormat.BANNER, AdUnitFormat.VIDEO)).apply {
                     setMinSizePercentage(80, 60)
                     videoParameters = configureVideoParameters()
                 }
             }
-            adUnit.fetchDemand(adRequest) { callback() }
-        } else {
-            callback()
+            val finalRequest = apsRequestBuilder?.let {
+                adRequest.customTargeting.keySet().forEach { key ->
+                    it.addCustomTargeting(key, adRequest.customTargeting.getString(key, ""))
+                }
+                it.build()
+            } ?: adRequest
+            adUnit.fetchDemand(finalRequest) { callback(finalRequest) }
         }
+
+        fun aps(wait: Boolean) {
+            var actionTaken = false
+            val matchingSlots = arrayListOf<DTBAdSize>()
+            sdkConfig?.aps?.slots?.firstOrNull { slot -> slot.height == "inter" && slot.width == "inter" }?.let {
+                matchingSlots.add(DTBAdSize.DTBInterstitialAdSize(it.slotId ?: ""))
+            }
+            if (formatNeeded?.contains("video", true) == true) {
+                sdkConfig?.aps?.slots?.firstOrNull { slot -> slot.height?.toIntOrNull() == 480 && slot.width?.toIntOrNull() == 320 }?.let {
+                    matchingSlots.add(DTBAdSize.DTBVideo(320, 480, it.slotId ?: ""))
+                }
+            }
+            val loader = DTBAdRequest()
+            val apsCallback = object : DTBAdCallback {
+                override fun onFailure(adError: AdError) {
+                    if (actionTaken) return
+                    actionTaken = true
+                    if (wait) {
+                        prebid(null)
+                    } else {
+                        callback(adRequest)
+                    }
+                }
+
+                override fun onSuccess(dtbAdResponse: DTBAdResponse) {
+                    if (actionTaken) return
+                    actionTaken = true
+                    val apsRequest = DTBAdUtil.INSTANCE.createAdManagerAdRequestBuilder(dtbAdResponse)
+                    if (formatNeeded?.contains("video", true) == true) {
+                        dtbAdResponse.defaultVideoAdsRequestCustomParams.forEach {
+                            apsRequest.addCustomTargeting(it.key, it.value)
+                        }
+                    }
+                    if (wait) {
+                        prebid(apsRequest)
+                    } else {
+                        adRequest.customTargeting.keySet().forEach { key ->
+                            apsRequest.addCustomTargeting(key, adRequest.customTargeting.getString(key, ""))
+                        }
+                        callback(apsRequest.build())
+                    }
+                }
+            }
+            if (matchingSlots.isEmpty() || !AdRegistration.isInitialized()) {
+                apsCallback.onFailure(AdError(AdError.ErrorCode.NO_FILL, "error"))
+                return
+            }
+            loader.setSizes(*matchingSlots.toTypedArray())
+            loader.loadAd(apsCallback)
+            sdkConfig?.aps?.timeout?.let {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    apsCallback.onFailure(AdError(AdError.ErrorCode.NO_FILL, "error"))
+                }, it.toLongOrNull() ?: 1000)
+            }
+        }
+
+        log { "Fetch Demand with aps : $apsAvailable and with prebid : $prebidAvailable" }
+        if (apsAvailable && prebidAvailable) {
+            aps(true)
+        } else if (apsAvailable) {
+            aps(false)
+        } else if (prebidAvailable) {
+            prebid()
+        } else {
+            callback(adRequest)
+        }
+
     }
 
     private fun configureVideoParameters(): VideoParameters {
