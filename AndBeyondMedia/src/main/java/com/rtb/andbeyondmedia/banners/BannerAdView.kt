@@ -142,6 +142,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         loadFallbackAd(imageView, webView, fallbackBanner)
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
         fun sendFailure(error: String) {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
@@ -178,8 +179,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             adListener.onAdClicked()
         }
         bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
-            Glide.with(ad).load(it.first).into(ad)
-            webView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+            val newWebView = WebView(context).apply {
+                settings.javaScriptEnabled = true
+            }
+            newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+            newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+            binding.root.removeAllViews()
+            binding.root.addView(newWebView)
         }
     }
 

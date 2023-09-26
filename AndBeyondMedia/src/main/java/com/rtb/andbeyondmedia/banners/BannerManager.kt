@@ -49,7 +49,6 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
-import org.json.JSONArray
 import org.json.JSONObject
 import org.prebid.mobile.BannerAdUnit
 import org.prebid.mobile.Signals
@@ -815,7 +814,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return hold
     }
 
-    fun initiateOpenRTB(adSize: AdSize = AdSize.MEDIUM_RECTANGLE, onResponse: (Pair<String, String>) -> Unit) {
+    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit) {
         if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
         if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 100)) return
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
@@ -833,17 +832,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
             override fun onFailure(call: Call, e: IOException) {}
 
             override fun onResponse(call: Call, response: Response) {
-                val responseData = JSONObject(response.body.string())
                 CoroutineScope(Dispatchers.Main).launch {
                     try {
-                        val seatBids = responseData.get("seatbid") as JSONArray
-                        if (!seatBids.isNull(0)) {
-                            val firstBidList = seatBids[0] as JSONObject
-                            val bids = firstBidList.get("bid") as JSONArray
-                            if (!bids.isNull(0)) {
+                        val responseData = JSONObject(response.body.string())
+                        val seatBids = responseData.optJSONArray("seatbid")
+                        if (seatBids?.isNull(0) == false) {
+                            val firstBidList = seatBids[0] as? JSONObject
+                            val bids = firstBidList?.optJSONArray("bid")
+                            if (bids?.isNull(0) == false) {
                                 val firstBid = bids[0] as JSONObject
-                                val imageUrl = firstBid.getString("iurl")
-                                val scriptUrl = firstBid.getString("adm")
+                                val imageUrl = firstBid.optString("iurl")
+                                val scriptUrl = firstBid.optString("adm")
                                 onResponse(Pair(imageUrl, scriptUrl))
                             }
                         }
