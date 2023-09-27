@@ -916,10 +916,15 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } ?: countrySetup.third?.let {
             geo["lat"] = it.latitude ?: 0.0
             geo["lon"] = it.longitude ?: 0.0
-            geo["type"] = 1
+            geo["type"] = 2
             geo["country"] = it.countryCode ?: ""
         }
         val request = demoRequest.replace("{id}", uniqueId)
+                .replace("{name}", "AndBeyondMedia")
+                .replace("{bundle}", context.packageName)
+                .replace("{domain}", sdkConfig?.prebid?.domain ?: "")
+                .replace("{storeurl}", sdkConfig?.prebid?.storeURL ?: "")
+                .replace("{version}", BuildConfig.ADAPTER_VERSION)
                 .replace("{sizes}", Gson().toJson(arrayListOf(hashMapOf("w" to adSize.width, "h" to adSize.height))))
                 .replace("{os}", "Android")
                 .replace("{osv}", Build.VERSION.RELEASE)
