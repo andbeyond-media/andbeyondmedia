@@ -54,6 +54,8 @@ import org.prebid.mobile.BannerAdUnit
 import org.prebid.mobile.Signals
 import org.prebid.mobile.VideoParameters
 import org.prebid.mobile.api.data.AdUnitFormat
+import p.haeg.w.i
+import p.haeg.w.sd
 import java.io.IOException
 import java.util.Date
 import java.util.EnumSet
@@ -308,9 +310,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
         view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
     }
 
+    @Suppress("KotlinConstantConditions")
     fun saveVisibility(visible: Boolean) {
         if (visible == bannerConfig.isVisible) return
+        var tryInstantRefresh = false
+        bannerConfig.isVisible?.let { savedVisibility ->
+            tryInstantRefresh = !savedVisibility && visible
+        }
         bannerConfig.isVisible = visible
+        if (tryInstantRefresh && sdkConfig?.instantRefresh == 1) {
+            refresh(0, unfilled = false, instantRefresh = true)
+        }
     }
 
     fun adReported(creativeId: String?, reportReasons: List<String>) {
@@ -413,7 +423,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         bannerConfig.let {
             timers?.let { active ->
                 if (active == 1) startActiveCounter(it.activeRefreshInterval.toLong())
-                else startPassiveCounter(it.passiveRefreshInterval.toLong())
+                else if (active == 0) startPassiveCounter(it.passiveRefreshInterval.toLong())
             } ?: kotlin.run {
                 startPassiveCounter(it.passiveRefreshInterval.toLong())
                 startActiveCounter(it.activeRefreshInterval.toLong())
@@ -426,7 +436,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (seconds <= 0) return
         activeTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                if (bannerConfig.isVisible) {
+                if (bannerConfig.isVisible == true) {
                     bannerConfig.isVisibleFor++
                 }
                 bannerConfig.activeRefreshInterval--
@@ -474,10 +484,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         unfilledRefreshCounter?.start()
     }
 
-    fun refresh(active: Int = 1, unfilled: Boolean = false) {
+    fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false) {
+        view.log { "Trying opportunity: active = $active, retrying = $unfilled, instant = $instantRefresh" }
         val currentTimeStamp = Date().time
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
+            view.log { "Opportunity Taken: active = $active, unfilled = $unfilled, instant = $instantRefresh" }
             bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes.apply {
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
@@ -487,18 +499,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
 
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
-        if (unfilled) {
-            view.log { "Retrying" }
-        }
-        val timers = if (active == 0 && unfilled) {
+        var timers = if (active == 0 && unfilled) {
             null
         } else {
             active
         }
+        if (instantRefresh) {
+            timers = 2
+        }
         var takeOpportunity = false
         if (active == 1) {
             var pickOpportunity = false
-            if (bannerConfig.isVisible) {
+            if (bannerConfig.isVisible == true) {
                 pickOpportunity = true
             } else {
                 if (bannerConfig.visibleFactor < 0) {
@@ -518,7 +530,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } else if (active == 0) {
             var pickOpportunity = false
             if (isForegroundRefresh == 1) {
-                if (bannerConfig.isVisible) {
+                if (bannerConfig.isVisible == true) {
                     pickOpportunity = true
                 } else {
                     if (bannerConfig.factor < 0) {
@@ -920,7 +932,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             geo["country"] = it.countryCode ?: ""
         }
         val request = demoRequest.replace("{id}", uniqueId)
-                .replace("{name}", "AndBeyondMedia")
+                .replace("{name}", context.packageName.replace(".", ""))
                 .replace("{bundle}", context.packageName)
                 .replace("{domain}", sdkConfig?.prebid?.domain ?: "")
                 .replace("{storeurl}", sdkConfig?.prebid?.storeURL ?: "")
@@ -942,5 +954,16 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{geo}", Gson().toJson(geo))
 
         return request.toRequestBody()
+    }
+
+    fun attachScript(currentAdUnit: String, loadedSize: AdSize?): String? {
+        return if (loadedSize == null || currentAdUnit == bannerConfig.publisherAdUnit || sdkConfig?.trackingConfig?.getScript().isNullOrEmpty()) {
+            null
+        } else {
+            sdkConfig?.trackingConfig?.getScript()
+                    ?.replace("ADUNIT", currentAdUnit)
+                    ?.replace("HEIGHT", loadedSize.height.toString())
+                    ?.replace("WIDTH", loadedSize.width.toString())
+        }
     }
 }

@@ -263,6 +263,19 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
+    fun impressOnAdLooks() {
+        bannerManager.attachScript(currentAdUnit, adView.adSize)?.let {
+            val webView = WebView(context).apply {
+                settings.javaScriptEnabled = true
+                layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
+                loadData(it, "text/html; charset=utf-8", "UTF-8")
+            }
+            log { "Adunit $currentAdUnit impressed on adlooks" }
+            binding.root.addView(webView)
+        }
+    }
+
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
         bannerManager.saveVisibility(isVisible)
@@ -311,6 +324,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdImpression()
             }
+            impressOnAdLooks()
         }
 
         override fun onAdLoaded() {

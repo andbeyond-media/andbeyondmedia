@@ -29,6 +29,8 @@ internal data class SDKConfig(
         val openRTb: OpenRTBConfig? = null,
         @SerializedName("geoedge")
         val geoEdge: GeoEdge? = null,
+        @SerializedName("tracking")
+        val trackingConfig: TrackingConfig? = null,
         @SerializedName("network_block")
         val networkBlock: String? = null,
         @SerializedName("diff")
@@ -39,6 +41,8 @@ internal data class SDKConfig(
         val networkCode: String? = null,
         @SerializedName("global")
         val switch: Int? = null,
+        @SerializedName("instant_refresh")
+        val instantRefresh: Int? = null,
         @SerializedName("active")
         var activeRefreshInterval: Int? = null,
         @SerializedName("passive")
@@ -70,6 +74,20 @@ internal data class SDKConfig(
         @SerializedName("native_fallback")
         val nativeFallback: Int? = null
 ) {
+
+    @Keep
+    data class TrackingConfig(
+            @SerializedName("percentage")
+            val percentage: Int? = null,
+            @SerializedName("script")
+            private val script: String? = null
+    ) {
+        fun getScript() = if (script == null) {
+            null
+        } else {
+            String.format("<script type=\"text/javascript\" src=\"%s\"></script>", script)
+        }
+    }
 
     @Keep
     data class Events(

@@ -46,7 +46,7 @@ internal data class BannerConfig(
         @SerializedName("refreshCount")
         var refreshCount: Int = 0,
         @SerializedName("isVisible")
-        var isVisible: Boolean = false,
+        var isVisible: Boolean? = null,
         @SerializedName("isVisibleFor")
         var isVisibleFor: Long = 0,
         @SerializedName("lastRefreshAt")
