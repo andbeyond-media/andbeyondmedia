@@ -1,10 +1,16 @@
 package com.rtb.andbeyondmedia.banners
 
+import android.app.Activity
 import android.content.Context
+import android.graphics.Point
+import android.net.ConnectivityManager
+import android.os.Build
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
+import android.telephony.TelephonyManager
 import android.view.View
+import android.webkit.WebView
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.amazon.device.ads.AdError
@@ -21,6 +27,9 @@ import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.connectionAvailable
+import com.rtb.andbeyondmedia.common.getDeviceId
+import com.rtb.andbeyondmedia.common.getLocation
+import com.rtb.andbeyondmedia.common.getUniqueId
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
@@ -29,12 +38,26 @@ import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import okhttp3.Call
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okhttp3.logging.HttpLoggingInterceptor
+import org.json.JSONObject
 import org.prebid.mobile.BannerAdUnit
 import org.prebid.mobile.Signals
 import org.prebid.mobile.VideoParameters
 import org.prebid.mobile.api.data.AdUnitFormat
+import java.io.IOException
 import java.util.Date
 import java.util.EnumSet
+import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 
 
@@ -789,5 +812,135 @@ internal class BannerManager(private val context: Context, private val bannerLis
             view.log { "Blocking refresh on : $adUnit" }
         }
         return hold
+    }
+
+    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit) {
+        if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
+        if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 100)) return
+        val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
+        val openRTB = sdkConfig?.openRTb!!
+        val requestBody = prepareRequestBody(openRTB.request, adSize)
+        val loggingInterceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+        val client: OkHttpClient = OkHttpClient.Builder().addInterceptor(loggingInterceptor)
+                .connectTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS)
+                .writeTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS)
+                .readTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS).build()
+        val request: Request = Request.Builder().url(urlBuilder).apply {
+            openRTB.headers?.forEach { addHeader(it.key ?: "", it.value ?: "") }
+        }.method("POST", requestBody).build()
+        client.newCall(request).enqueue(object : okhttp3.Callback {
+            override fun onFailure(call: Call, e: IOException) {}
+
+            override fun onResponse(call: Call, response: Response) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        val responseData = JSONObject(response.body.string())
+                        val seatBids = responseData.optJSONArray("seatbid")
+                        if (seatBids?.isNull(0) == false) {
+                            val firstBidList = seatBids[0] as? JSONObject
+                            val bids = firstBidList?.optJSONArray("bid")
+                            if (bids?.isNull(0) == false) {
+                                val firstBid = bids[0] as JSONObject
+                                val imageUrl = firstBid.optString("iurl")
+                                val scriptUrl = firstBid.optString("adm")
+                                onResponse(Pair(imageUrl, scriptUrl))
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+        })
+    }
+
+    private fun prepareRequestBody(demoRequest: String?, adSize: AdSize): RequestBody {
+        if (demoRequest.isNullOrEmpty()) return "".toRequestBody()
+        val uniqueId = getUniqueId()
+        val heightWidth = try {
+            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                context.display
+            } else {
+                (context as? Activity)?.windowManager?.defaultDisplay
+            }
+            val size = Point()
+            display?.getSize(size)
+            val width = size.x
+            val height = size.y
+            Pair(width, height)
+        } catch (e: Throwable) {
+            Pair(0, 0)
+        }
+
+        val simInfo = try {
+            val telephonyManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                context.getSystemService(TelephonyManager::class.java)
+            } else {
+                context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            }
+            var mcc_mnc = ""
+            if (telephonyManager.networkOperator.isNotEmpty()) {
+                val operator = telephonyManager.networkOperator
+                if (operator.length >= 3) {
+                    mcc_mnc = operator.substring(0, 3)
+                }
+                if (operator.length > 3) {
+                    mcc_mnc = "${mcc_mnc}-${operator.substring(3)}"
+                }
+            }
+            Pair(mcc_mnc, telephonyManager.simOperatorName)
+        } catch (e: Throwable) {
+            Pair("", "")
+        }
+        val connectionType = try {
+            val connectivityManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                context.getSystemService(ConnectivityManager::class.java)
+            } else {
+                context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            }
+            if (connectivityManager.isActiveNetworkMetered) "1" else "2"
+        } catch (e: Throwable) {
+            ""
+        }
+        val ext = hashMapOf<String, String>()
+        sdkConfig?.prebid?.extParams?.forEach {
+            ext[it.key ?: ""] = it.value ?: ""
+        }
+        val geo = HashMap<String, Any>()
+        context.getLocation()?.let {
+            geo["lat"] = it.latitude
+            geo["lon"] = it.longitude
+            geo["type"] = 1
+            geo["country"] = "IN"
+        } ?: countrySetup.third?.let {
+            geo["lat"] = it.latitude ?: 0.0
+            geo["lon"] = it.longitude ?: 0.0
+            geo["type"] = 2
+            geo["country"] = it.countryCode ?: ""
+        }
+        val request = demoRequest.replace("{id}", uniqueId)
+                .replace("{name}", "AndBeyondMedia")
+                .replace("{bundle}", context.packageName)
+                .replace("{domain}", sdkConfig?.prebid?.domain ?: "")
+                .replace("{storeurl}", sdkConfig?.prebid?.storeURL ?: "")
+                .replace("{version}", BuildConfig.ADAPTER_VERSION)
+                .replace("{sizes}", Gson().toJson(arrayListOf(hashMapOf("w" to adSize.width, "h" to adSize.height))))
+                .replace("{os}", "Android")
+                .replace("{osv}", Build.VERSION.RELEASE)
+                .replace("{ifa}", context.getDeviceId())
+                .replace("{make}", Build.MANUFACTURER)
+                .replace("{model}", Build.MODEL)
+                .replace("{ua}", WebView(context).settings.userAgentString)
+                .replace("{w}", heightWidth.first.toString())
+                .replace("{h}", heightWidth.second.toString())
+                .replace("{pxratio}", (if (heightWidth.first > 0) heightWidth.second.toFloat() / heightWidth.first.toFloat() else 0).toString())
+                .replace("{mccmnc}", simInfo.first)
+                .replace("{carier}", simInfo.second)
+                .replace("{type}", connectionType)
+                .replace("{ext}", Gson().toJson(ext))
+                .replace("{geo}", Gson().toJson(geo))
+
+        return request.toRequestBody()
     }
 }
