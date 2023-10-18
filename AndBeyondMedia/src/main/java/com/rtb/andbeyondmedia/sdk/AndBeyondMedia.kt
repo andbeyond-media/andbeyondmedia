@@ -14,6 +14,7 @@ import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
@@ -349,7 +350,11 @@ internal class StoreService(private val prefs: SharedPreferences) {
         get() {
             val string = prefs.getString("CONFIG", "") ?: ""
             if (string.isEmpty()) return null
-            return Gson().fromJson(string, SDKConfig::class.java)
+            return try {
+                GsonBuilder().create().fromJson(string, SDKConfig::class.java)
+            } catch (e: Throwable) {
+                null
+            }
         }
         set(value) = prefs.edit().apply {
             value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
@@ -359,7 +364,11 @@ internal class StoreService(private val prefs: SharedPreferences) {
         get() {
             val string = prefs.getString("COUNTRY", "") ?: ""
             if (string.isEmpty()) return null
-            return Gson().fromJson(string, CountryModel::class.java)
+            return try {
+                GsonBuilder().create().fromJson(string, CountryModel::class.java)
+            } catch (e: Throwable) {
+                null
+            }
         }
         set(value) = prefs.edit().apply {
             value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }

@@ -83,7 +83,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 }
             })
         } catch (e: Throwable) {
-            e.printStackTrace()
             BannerManager(context, this, null)
         }
 
@@ -156,13 +155,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
                     sendFailure(e?.message ?: "")
-                    return false
+                    return true
                 }
 
                 override fun onResourceReady(resource: Drawable, model: Any, target: Target<Drawable>?, dataSource: DataSource, isFirstResource: Boolean): Boolean {
                     adListener.onAdLoaded()
                     adListener.onAdImpression()
-                    return false
+                    return true
                 }
             }).into(ad)
         } catch (e: Throwable) {
@@ -173,8 +172,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             try {
                 val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackBanner.url ?: ""))
                 context.startActivity(browserIntent)
-            } catch (e: Throwable) {
-                e.printStackTrace()
+            } catch (_: Throwable) {
             }
             adListener.onAdClicked()
         }
@@ -221,7 +219,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         if (!this::currentAdUnit.isInitialized) return false
         fun load() {
             if (this::adView.isInitialized) {
-                log { "loadAd&load : ${Gson().toJson(adRequest.customTargeting)}" }
+                log { "loadAd&load : ${adRequest.customTargeting}" }
                 isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
                 bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
             }
@@ -259,7 +257,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             })
         } catch (e: Throwable) {
             log { "Adding GeoEdgeFailed with first look: $firstLook" }
-            e.printStackTrace()
         }
     }
 
@@ -302,14 +299,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
             } catch (e: Throwable) {
-                e.printStackTrace()
                 false
             }
             if (!retryStatus) {
                 retryStatus = try {
                     bannerManager.checkFallback(isRefreshLoaded)
                 } catch (e: Throwable) {
-                    e.printStackTrace()
                     false
                 }
             }
@@ -377,8 +372,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     }
                 }
             })
-        } catch (e: Throwable) {
-            e.printStackTrace()
+        } catch (_: Throwable) {
         }
     }
 

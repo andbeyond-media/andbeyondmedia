@@ -132,6 +132,8 @@ internal data class SDKConfig(
             val firstLook: Int? = null,
             @SerializedName("other")
             val other: Int? = null,
+            @SerializedName("retry")
+            val retry: Int? = null,
             @SerializedName("host")
             val host: String? = null,
             @SerializedName("accountid")
@@ -152,7 +154,7 @@ internal data class SDKConfig(
             val storeURL: String? = null,
             @SerializedName("omid_partner_name")
             val omidPartnerName: String? = null,
-            @SerializedName("omit_partner_version")
+            @SerializedName("omit_partner_version", alternate = ["omid_partner_version"])
             val omidPartnerVersion: String? = null,
             @SerializedName("key_values")
             val extParams: List<KeyValuePair>? = null
@@ -171,6 +173,8 @@ internal data class SDKConfig(
             val firstLook: Int? = null,
             @SerializedName("other")
             val other: Int? = null,
+            @SerializedName("retry")
+            val retry: Int? = null,
             @SerializedName("timeout")
             val timeout: String? = null,
             @SerializedName("delay")

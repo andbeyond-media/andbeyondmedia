@@ -54,8 +54,6 @@ import org.prebid.mobile.BannerAdUnit
 import org.prebid.mobile.Signals
 import org.prebid.mobile.VideoParameters
 import org.prebid.mobile.api.data.AdUnitFormat
-import p.haeg.w.i
-import p.haeg.w.sd
 import java.io.IOException
 import java.util.Date
 import java.util.EnumSet
@@ -139,17 +137,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     }
                 }
             })
-        } catch (e: Throwable) {
-            e.message
+        } catch (_: Throwable) {
         }
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
     fun shouldSetConfig(callback: (Boolean) -> Unit) {
+        var actualCallback: ((Boolean) -> Unit)? = callback
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
-            callback(false)
+            actualCallback?.invoke(false)
+            actualCallback = null
         } else {
             try {
                 val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
@@ -159,14 +158,20 @@ internal class BannerManager(private val context: Context, private val bannerLis
                             workerData.removeObserver(this)
                             sdkConfig = storeService.config
                             shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                            callback(shouldBeActive)
+                            actualCallback?.invoke(shouldBeActive)
+                            actualCallback = null
                         }
                     }
                 })
             } catch (e: Throwable) {
-                callback(false)
+                actualCallback?.invoke(false)
+                actualCallback = null
             }
         }
+        Handler(Looper.getMainLooper()).postDelayed({
+            actualCallback?.invoke(false)
+            actualCallback = null
+        }, 4000)
     }
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String) {
@@ -624,14 +629,22 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: (AdManagerAdRequest) -> Unit) {
-        val prebidAvailable = if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
+        var prebidAvailable = if ((firstLook && sdkConfig?.prebid?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.prebid?.other == 1)) {
             bannerConfig.placement != null && bannerConfig.adSizes.isNotEmpty()
         } else {
             false
         }
 
-        val apsAvailable = (firstLook && sdkConfig?.aps?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.aps?.other == 1)
+        var apsAvailable = (firstLook && sdkConfig?.aps?.firstLook == 1) || ((bannerConfig.isNewUnit || !firstLook) && sdkConfig?.aps?.other == 1)
 
+        if (adRequest.customTargeting.getString("retry") == "1") {
+            if ((sdkConfig?.prebid?.retry ?: 0) == 0) {
+                prebidAvailable = false
+            }
+            if ((sdkConfig?.aps?.retry ?: 0) == 0) {
+                apsAvailable = false
+            }
+        }
 
         fun prebid(apsRequestBuilder: AdManagerAdRequest.Builder? = null) = bannerConfig.placement?.let {
             val totalSizes = bannerConfig.adSizes
@@ -858,8 +871,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                                 onResponse(Pair(imageUrl, scriptUrl))
                             }
                         }
-                    } catch (e: Throwable) {
-                        e.printStackTrace()
+                    } catch (_: Throwable) {
                     }
                 }
             }

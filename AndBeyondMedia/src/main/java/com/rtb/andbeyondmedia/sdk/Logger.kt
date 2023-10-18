@@ -20,9 +20,9 @@ internal fun Logger.log(tag: String = TAG, msg: String) {
 internal fun log(getMessage: () -> String) {
     if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
         try {
-            Log.i(AndBeyondMedia.specialTag, getMessage())
-        } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.i(AndBeyondMedia.specialTag ?: "", getMessage())
+        } catch (_: Throwable) {
+
         }
     }
 }
@@ -31,8 +31,7 @@ internal fun View?.log(getMessage: () -> String) {
     if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
         try {
             Log.i(AndBeyondMedia.specialTag, String.format("%d-%s", this?.id ?: -1, getMessage()))
-        } catch (e: Throwable) {
-            e.printStackTrace()
+        } catch (_: Throwable) {
         }
     }
 }
