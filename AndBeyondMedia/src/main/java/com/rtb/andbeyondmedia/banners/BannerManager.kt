@@ -41,6 +41,7 @@ import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -121,23 +122,24 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    private fun getCountryConfig() {
+    private fun getCountryConfig() = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(CountryDetectionWorker::class.java.simpleName).get()
-        if (workers.isNullOrEmpty()) {
-            return
+        val workers = withContext(Dispatchers.IO) {
+            workManager.getWorkInfosForUniqueWork(CountryDetectionWorker::class.java.simpleName).get()
         }
-        try {
-            val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
-            workerData?.observeForever(object : Observer<WorkInfo?> {
-                override fun onChanged(value: WorkInfo?) {
-                    if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
-                        workerData.removeObserver(this)
-                        countrySetup = Triple(true, false, storeService.detectedCountry)
+        if (workers.isNotEmpty()) {
+            try {
+                val workerData = workManager.getWorkInfoByIdLiveData(workers[0].id)
+                workerData?.observeForever(object : Observer<WorkInfo?> {
+                    override fun onChanged(value: WorkInfo?) {
+                        if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
+                            workerData.removeObserver(this)
+                            countrySetup = Triple(true, false, storeService.detectedCountry)
+                        }
                     }
-                }
-            })
-        } catch (_: Throwable) {
+                })
+            } catch (_: Throwable) {
+            }
         }
     }
 
@@ -215,7 +217,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 adSizes
             }
         }
-        view.log { String.format("%s:%s", "setConfig", Gson().toJson(bannerConfig)) }
+        view.log { "setConfig :$bannerConfig" }
         setCountryConfig()
     }
 
@@ -312,7 +314,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             validCountryConfig.nativeFallback?.let { nativeFallback = it }
         }
         countrySetup = Triple(countrySetup.first, true, countrySetup.third)
-        view.log { String.format("%s:%s", "set CountryWise Config", Gson().toJson(bannerConfig)) }
+        view.log { "set CountryWise Config: $bannerConfig" }
     }
 
     @Suppress("KotlinConstantConditions")
@@ -420,7 +422,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun startRefreshing(resetVisibleTime: Boolean = false, isPublisherLoad: Boolean = false, timers: Int? = null) {
-        view.log { "startRefreshing: resetVisibleTime: $resetVisibleTime isPublisherLoad: $isPublisherLoad timers: $timers" }
+        view.log { "startRefreshing: resetVisibleTime: $resetVisibleTime isPublisherLoad: $isPublisherLoad timers: $timers passive : ${bannerConfig.passiveRefreshInterval} active: ${bannerConfig.activeRefreshInterval}" }
         if (resetVisibleTime) {
             bannerConfig.isVisibleFor = 0
         }
@@ -437,8 +439,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun startActiveCounter(seconds: Long) {
-        activeTimeCounter?.cancel()
         if (seconds <= 0) return
+        activeTimeCounter?.cancel()
         activeTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 if (bannerConfig.isVisible == true) {
@@ -456,8 +458,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun startPassiveCounter(seconds: Long) {
-        passiveTimeCounter?.cancel()
         if (seconds <= 0) return
+        passiveTimeCounter?.cancel()
         passiveTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 bannerConfig.passiveRefreshInterval--
@@ -475,8 +477,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
         val passiveTime = sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L
         val difference = sdkConfig?.difference?.toLong() ?: 0L
         val seconds = if (passiveTime <= difference) difference else passiveTime
-        unfilledRefreshCounter?.cancel()
         if (seconds <= 0) return
+        unfilledRefreshCounter?.cancel()
         unfilledRefreshCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
 

@@ -385,8 +385,13 @@ data class Fallback(
             @SerializedName("url")
             val url: String? = null,
             @SerializedName("tag")
-            val tag: String? = null
-    )
+            private val tag: String? = null
+    ) {
+        fun getScriptSource() = if (tag.isNullOrEmpty())
+            null
+        else
+            String.format("<SCRIPT language='JavaScript1.1' SRC=\"%s\" attributionsrc ></SCRIPT>", tag)
+    }
 }
 
 
@@ -398,5 +403,4 @@ data class CountryModel(
         val latitude: Double? = null,
         @SerializedName("longitude", alternate = ["lon"])
         val longitude: Double? = null,
-
-        )
+)

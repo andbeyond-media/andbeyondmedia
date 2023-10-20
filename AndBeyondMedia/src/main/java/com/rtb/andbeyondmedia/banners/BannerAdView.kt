@@ -149,19 +149,19 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
         }
         try {
-            fallbackBanner.tag?.let {
+            fallbackBanner.getScriptSource()?.let {
                 webView.loadData(it, "text/html; charset=utf-8", "UTF-8")
             }
             Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
                     sendFailure(e?.message ?: "")
-                    return true
+                    return false
                 }
 
                 override fun onResourceReady(resource: Drawable, model: Any, target: Target<Drawable>?, dataSource: DataSource, isFirstResource: Boolean): Boolean {
                     adListener.onAdLoaded()
                     adListener.onAdImpression()
-                    return true
+                    return false
                 }
             }).into(ad)
         } catch (e: Throwable) {
