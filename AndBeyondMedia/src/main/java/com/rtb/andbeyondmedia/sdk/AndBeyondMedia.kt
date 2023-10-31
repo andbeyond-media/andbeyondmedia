@@ -32,6 +32,7 @@ import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.QueryMap
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
@@ -197,7 +198,7 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
         val storeService = AndBeyondMedia.getStoreService(context)
         return try {
             val configService = AndBeyondMedia.getConfigService()
-            val response = configService.getConfig(hashMapOf("name" to context.packageName)).execute()
+            val response = configService.getConfig(context.packageName).execute()
             if (response.isSuccessful && response.body() != null) {
                 storeService.config = response.body()
                 Result.success()
@@ -332,8 +333,8 @@ internal object SDKManager {
 }
 
 internal interface ConfigService {
-    @GET("appconfig1.php")
-    fun getConfig(@QueryMap params: HashMap<String, Any>): Call<SDKConfig>
+    @GET("appconfig_{package}.js")
+    fun getConfig(@Path("package") packageName: String): Call<SDKConfig>
 }
 
 internal interface CountryService {
