@@ -26,6 +26,7 @@ import com.bumptech.glide.request.target.Target
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.R
@@ -51,6 +52,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private var adType: String = AdTypes.BANNER
     private lateinit var currentAdUnit: String
     private lateinit var currentAdSizes: List<AdSize>
+    private var videoOptions: VideoOptions? = null
     private var firstLook = true
     private var bannerAdListener: BannerAdListener? = null
     private lateinit var viewState: Lifecycle.Event
@@ -121,6 +123,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
         adView.adUnitId = adUnitId
         adView.adListener = adListener
+        videoOptions?.let { adView.setVideoOptions(it) }
         binding.root.removeAllViews()
         binding.root.addView(adView)
         log { "attachAdView : $adUnitId" }
@@ -205,6 +208,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     fun setAdType(adType: String) {
         this.adType = adType
+        if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
+        }
+    }
+
+    fun setVideoOptions(videoOptions: VideoOptions) {
+        this.videoOptions = videoOptions
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
             attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
         }
