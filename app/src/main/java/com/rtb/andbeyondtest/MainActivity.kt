@@ -166,7 +166,6 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         super.onPause()
         binding.bannerAd.pauseAd()
         adaptiveAd?.pauseAd()
-
     }
 
     override fun onDestroy() {
