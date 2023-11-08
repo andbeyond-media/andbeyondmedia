@@ -147,11 +147,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     @SuppressLint("SetJavaScriptEnabled")
     private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
         fun sendFailure(error: String) {
+            log { "Fallback for $currentAdUnit Failed with error : $error" }
+            bannerManager.startUnfilledRefreshCounter()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdFailedToLoad(error, false)
             }
         }
         try {
+            log { "Attach fallback for : $currentAdUnit" }
             fallbackBanner.getScriptSource()?.let {
                 webView.loadData(it, "text/html; charset=utf-8", "UTF-8")
             }
@@ -167,7 +170,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     return false
                 }
             }).into(ad)
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
         }
 
@@ -314,9 +317,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (!retryStatus) {
                 retryStatus = try {
                     bannerManager.checkFallback(isRefreshLoaded)
-                } catch (e: Throwable) {
+                } catch (_: Throwable) {
                     false
                 }
+            }
+            if (!retryStatus) {
+                bannerManager.startUnfilledRefreshCounter()
             }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdFailedToLoad(p0.toString(), retryStatus)
@@ -329,7 +335,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdImpression()
             }
-            impressOnAdLooks()
+            if (isRefreshLoaded) {
+                impressOnAdLooks()
+            }
         }
 
         override fun onAdLoaded() {

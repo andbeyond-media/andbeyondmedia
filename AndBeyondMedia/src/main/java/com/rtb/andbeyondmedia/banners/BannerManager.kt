@@ -52,7 +52,9 @@ import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import org.prebid.mobile.BannerAdUnit
+import org.prebid.mobile.BannerParameters
 import org.prebid.mobile.Signals
+import org.prebid.mobile.Signals.Api
 import org.prebid.mobile.VideoParameters
 import org.prebid.mobile.api.data.AdUnitFormat
 import java.io.IOException
@@ -356,15 +358,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (shouldBeActive) {
             if (isPublisherLoad) {
                 return if (bannerConfig.unFilled?.status == 1) {
-                    startUnfilledRefreshCounter()
                     refresh(unfilled = true)
                     true
                 } else {
                     false
                 }
-
             } else {
-                startUnfilledRefreshCounter()
                 if ((bannerConfig.retryConfig?.retries ?: 0) > 0) {
                     bannerConfig.retryConfig?.retries = (bannerConfig.retryConfig?.retries ?: 0) - 1
                     Handler(Looper.getMainLooper()).postDelayed({
@@ -429,8 +428,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         this.wasFirstLook = isPublisherLoad
         bannerConfig.let {
             timers?.let { active ->
-                if (active == 1) startActiveCounter(it.activeRefreshInterval.toLong())
-                else if (active == 0) startPassiveCounter(it.passiveRefreshInterval.toLong())
+                when (active) {
+                    0 -> startPassiveCounter(it.passiveRefreshInterval.toLong())
+                    1 -> startActiveCounter(it.activeRefreshInterval.toLong())
+                    2 -> startUnfilledRefreshCounter()
+                }
             } ?: kotlin.run {
                 startPassiveCounter(it.passiveRefreshInterval.toLong())
                 startActiveCounter(it.activeRefreshInterval.toLong())
@@ -473,31 +475,31 @@ internal class BannerManager(private val context: Context, private val bannerLis
         passiveTimeCounter?.start()
     }
 
-    private fun startUnfilledRefreshCounter() {
-        val passiveTime = sdkConfig?.passiveRefreshInterval?.toLong() ?: 0L
-        val difference = sdkConfig?.difference?.toLong() ?: 0L
-        val seconds = if (passiveTime <= difference) difference else passiveTime
-        if (seconds <= 0) return
+    fun startUnfilledRefreshCounter() {
+        val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
+        if (time <= 0) return
         unfilledRefreshCounter?.cancel()
-        unfilledRefreshCounter = object : CountDownTimer(seconds * 1000, 1000) {
+        unfilledRefreshCounter = object : CountDownTimer(time * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
 
             }
 
             override fun onFinish() {
-                refresh(0, true)
+                refresh(0, true, fixedUnit = sdkConfig?.unfilledTimerConfig?.unit)
             }
         }
+        activeTimeCounter?.cancel()
+        passiveTimeCounter?.cancel()
         unfilledRefreshCounter?.start()
     }
 
-    fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false) {
+    fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false, fixedUnit: String? = null) {
         view.log { "Trying opportunity: active = $active, retrying = $unfilled, instant = $instantRefresh" }
         val currentTimeStamp = Date().time
         fun refreshAd() {
             bannerConfig.lastRefreshAt = currentTimeStamp
-            view.log { "Opportunity Taken: active = $active, unfilled = $unfilled, instant = $instantRefresh" }
-            bannerListener.attachAdView(getAdUnitName(unfilled, false), bannerConfig.adSizes.apply {
+            view.log { "Opportunity Taken: active = $active, retrying = $unfilled, instant = $instantRefresh" }
+            bannerListener.attachAdView(fixedUnit ?: getAdUnitName(unfilled, false), bannerConfig.adSizes.apply {
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
@@ -507,12 +509,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
         var timers = if (active == 0 && unfilled) {
-            null
+            2
         } else {
             active
         }
         if (instantRefresh) {
-            timers = 2
+            timers = 3
         }
         var takeOpportunity = false
         if (active == 1) {
@@ -565,7 +567,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
 
-        if (unfilled || (isForegroundRefresh == 1 && takeOpportunity && context.connectionAvailable() == true)) {
+        if (context.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity)) {
             refreshAd()
         } else {
             startRefreshing(timers = timers)
@@ -663,6 +665,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     videoParameters = configureVideoParameters()
                 }
             }
+            if (!sdkConfig?.prebid?.bannerAPIParameters.isNullOrEmpty()) {
+                adUnit.bannerParameters = BannerParameters().apply {
+                    api = sdkConfig?.prebid?.bannerAPIParameters?.map { number -> Api(number) }
+                }
+            }
             totalSizes.forEach { adSize -> adUnit.addAdditionalSize(adSize.width, adSize.height) }
             val finalRequest = apsRequestBuilder?.let { apsRequestBuilder ->
                 adRequest.customTargeting.keySet().forEach { key ->
@@ -739,7 +746,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun configureVideoParameters(): VideoParameters {
         return VideoParameters(listOf("video/x-flv", "video/mp4")).apply {
-            api = listOf(Signals.Api.VPAID_1, Signals.Api.VPAID_2)
+            api = listOf(Api.VPAID_1, Api.VPAID_2)
             maxBitrate = 1500
             minBitrate = 300
             maxDuration = 30
@@ -974,10 +981,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return if (loadedSize == null || currentAdUnit == bannerConfig.publisherAdUnit || sdkConfig?.trackingConfig?.getScript().isNullOrEmpty()) {
             null
         } else {
-            sdkConfig?.trackingConfig?.getScript()
-                    ?.replace("ADUNIT", currentAdUnit)
-                    ?.replace("HEIGHT", loadedSize.height.toString())
-                    ?.replace("WIDTH", loadedSize.width.toString())
+            try {
+                sdkConfig?.trackingConfig?.getScript()
+                        ?.replace("%%ADUNIT%%", currentAdUnit)
+                        ?.replace("%%HEIGHT%%", loadedSize.height.toString())
+                        ?.replace("%%WIDTH%%", loadedSize.width.toString())
+                        ?.replace("[CACHEBUSTING]", (0..Int.MAX_VALUE).random().toString())
+                        ?.replace("\$ADLOOX_WEBSITE", sdkConfig?.prebid?.domain ?: context.packageName)
+                        ?.replace("%%SITE%%", context.packageName)
+            } catch (_: Throwable) {
+                null
+            }
+
         }
     }
 }

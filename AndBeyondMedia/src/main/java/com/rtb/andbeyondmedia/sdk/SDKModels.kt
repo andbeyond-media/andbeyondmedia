@@ -1,7 +1,9 @@
 package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
+import com.amazon.aps.ads.Aps
 import com.google.gson.annotations.SerializedName
+import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 @Keep
 internal data class SDKConfig(
@@ -19,6 +21,8 @@ internal data class SDKConfig(
         val countryStatus: CountryStatus? = null,
         @SerializedName("retry_config")
         val retryConfig: RetryConfig? = null,
+        @SerializedName("unfilled_config")
+        val unfilledTimerConfig: UnfilledConfig? = null,
         @SerializedName("info")
         val infoConfig: InfoConfig? = null,
         @SerializedName("prebid")
@@ -117,6 +121,14 @@ internal data class SDKConfig(
     )
 
     @Keep
+    data class UnfilledConfig(
+            @SerializedName("time")
+            val time: Int? = null,
+            @SerializedName("unit")
+            val unit: String? = null
+    )
+
+    @Keep
     data class InfoConfig(
             @SerializedName("normal_info")
             val normalInfo: Int? = null,
@@ -157,7 +169,9 @@ internal data class SDKConfig(
             @SerializedName("omit_partner_version", alternate = ["omid_partner_version"])
             val omidPartnerVersion: String? = null,
             @SerializedName("key_values")
-            val extParams: List<KeyValuePair>? = null
+            val extParams: List<KeyValuePair>? = null,
+            @SerializedName("banner_api_parameters")
+            val bannerAPIParameters: List<Int>? = null
     ) {
         @Keep
         data class KeyValuePair(
