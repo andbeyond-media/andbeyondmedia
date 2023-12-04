@@ -14,6 +14,9 @@ dependencyResolutionManagement {
             url 'https://jitpack.io'
             credentials { username "jp_7n01f54jh15tek9vb60gmnb9rp" }
         }
+        maven {
+            url 'https://repo.pubmatic.com/artifactory/public-repos'
+        }
     }
 }
 rootProject.name = "AndBeyondMedia"

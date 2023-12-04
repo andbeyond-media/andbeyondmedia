@@ -35,6 +35,8 @@ internal data class SDKConfig(
         val geoEdge: GeoEdge? = null,
         @SerializedName("tracking")
         val trackingConfig: TrackingConfig? = null,
+        @SerializedName("pubmatic")
+        val openWrapConfig: OpenWrapConfig? = null,
         @SerializedName("network_block")
         val networkBlock: String? = null,
         @SerializedName("diff")
@@ -78,6 +80,11 @@ internal data class SDKConfig(
         @SerializedName("native_fallback")
         val nativeFallback: Int? = null
 ) {
+
+    @Keep
+    data class OpenWrapConfig(
+            val playStoreUrl: String? = null
+    )
 
     @Keep
     data class TrackingConfig(

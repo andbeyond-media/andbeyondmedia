@@ -596,20 +596,20 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkOverride(): AdManagerAdRequest? {
         if (bannerConfig.isNewUnit && bannerConfig.newUnit?.status == 1) {
+            view.log { "checkOverride on ${bannerConfig.publisherAdUnit}, status : new unit" }
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = false, newUnit = true), bannerConfig.adSizes.apply {
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
             })
-            view.log { "checkOverride: new Unit" }
             return createRequest(1).getAdRequest()
         } else if (checkHijack(bannerConfig.hijack)) {
+            view.log { "checkOverride on ${bannerConfig.publisherAdUnit}, status : hijack" }
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes.apply {
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
             })
-            view.log { "checkOverride: hijack" }
             return createRequest(1, hijacked = true).getAdRequest()
         }
         return null

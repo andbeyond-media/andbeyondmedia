@@ -15,6 +15,8 @@ import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListene
 import com.google.android.gms.ads.MobileAds
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.pubmatic.sdk.common.OpenWrapSDK
+import com.pubmatic.sdk.common.models.POBApplicationInfo
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
@@ -34,6 +36,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.QueryMap
+import java.net.MalformedURLException
+import java.net.URL
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -261,6 +265,7 @@ internal object SDKManager {
         initializePrebid(context, config.prebid)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
         initializeAPS(context, config.aps)
+        initializeOpenWrap(config.openWrapConfig)
     }
 
     private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
@@ -329,6 +334,16 @@ internal object SDKManager {
         } else {
             Handler(Looper.getMainLooper()).postDelayed({ init() }, aps.delay.toLongOrNull() ?: 1L)
         }
+    }
+
+    private fun initializeOpenWrap(owConfig: SDKConfig.OpenWrapConfig?) {
+        if (owConfig?.playStoreUrl.isNullOrEmpty()) return
+        val appInfo = POBApplicationInfo()
+        try {
+            appInfo.storeURL = URL(owConfig?.playStoreUrl ?: "")
+        } catch (_: MalformedURLException) {
+        }
+        OpenWrapSDK.setApplicationInfo(appInfo)
     }
 }
 
