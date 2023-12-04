@@ -123,10 +123,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             currentAdSizes = adSizes
         }
         currentAdUnit = adUnitId
-        if (adSizes.size == 1) {
-            adView.setAdSize(adSizes.first())
-        } else {
-            adView.setAdSizes(*adSizes.toTypedArray())
+        try {
+            when (adSizes.size) {
+                0 -> adView.setAdSize(AdSize.BANNER)
+                1 -> adView.setAdSize(adSizes.first())
+                else -> adView.setAdSizes(*adSizes.toTypedArray())
+            }
+        } catch (_: Throwable) {
+            adView.setAdSize(AdSize.BANNER)
         }
         adView.adUnitId = adUnitId
         adView.adListener = adListener
