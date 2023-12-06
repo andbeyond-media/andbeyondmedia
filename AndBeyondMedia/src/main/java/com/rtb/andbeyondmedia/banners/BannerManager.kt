@@ -193,6 +193,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         this.adType = adType
         this.pubAdSizes = adSizes
         bannerConfig.apply {
+            instantRefresh = sdkConfig?.instantRefresh
             customUnitName = String.format("/%s/%s-%s", getNetworkName(), sdkConfig?.affiliatedId.toString(), getUnitNameType(validConfig.nameType ?: "", sdkConfig?.supportedSizes, adSizes))
             isNewUnit = pubAdUnit.contains(sdkConfig?.networkId ?: "")
             publisherAdUnit = pubAdUnit
@@ -283,6 +284,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (sdkConfig?.countryStatus?.active != 1) return
         if (!countrySetup.first || countrySetup.second || countrySetup.third == null || countrySetup.third?.countryCode.isNullOrEmpty() || sdkConfig?.homeCountry?.contains(countrySetup.third?.countryCode ?: "IN", true) == true) return
         bannerConfig = bannerConfig.apply {
+            instantRefresh = sdkConfig?.instantRefresh
             val currentCountry = countrySetup.third?.countryCode ?: "IN"
             val validCountryConfig = sdkConfig?.countryConfigs?.firstOrNull { config -> config.name?.contains(currentCountry, true) == true || config.name?.contains("other") == true }
                     ?: return@apply
@@ -327,7 +329,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             tryInstantRefresh = !savedVisibility && visible
         }
         bannerConfig.isVisible = visible
-        if (tryInstantRefresh && sdkConfig?.instantRefresh == 1) {
+        if (tryInstantRefresh && bannerConfig.instantRefresh == 1) {
             refresh(0, unfilled = false, instantRefresh = true)
         }
     }
@@ -494,6 +496,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false, fixedUnit: String? = null) {
+        if (bannerConfig.adSizes.isEmpty()) return
         view.log { "Trying opportunity: active = $active, retrying = $unfilled, instant = $instantRefresh" }
         val currentTimeStamp = Date().time
         fun refreshAd() {

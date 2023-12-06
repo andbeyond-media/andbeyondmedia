@@ -9,6 +9,8 @@ import java.util.Date
 
 @Keep
 internal data class BannerConfig(
+        @SerializedName("instant_refresh")
+        var instantRefresh: Int? = null,
         @SerializedName("customUnitName")
         var customUnitName: String = "",
         @SerializedName("isNewUnit")
