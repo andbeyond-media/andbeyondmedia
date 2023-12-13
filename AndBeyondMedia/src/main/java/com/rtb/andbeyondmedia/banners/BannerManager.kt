@@ -146,7 +146,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    fun shouldSetConfig(callback: (Boolean) -> Unit) {
+    fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         var actualCallback: ((Boolean) -> Unit)? = callback
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
@@ -402,7 +402,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     isNetworkBlocked = true
                 }
             }
-            if (!isNetworkBlocked
+            var isRegionBlocked = false
+            val blockedRegions = sdkConfig?.regionBlock?.replace(" ", "")?.split(",") ?: listOf()
+            if (blockedRegions.isNotEmpty() && sdkConfig?.countryStatus?.active == 1 && (!countrySetup.third?.city.isNullOrEmpty() || !countrySetup.third?.countryCode.isNullOrEmpty())) {
+                isRegionBlocked = blockedRegions.any { it.equals(countrySetup.third?.city, true) || it.equals(countrySetup.third?.countryCode, true) }
+            }
+            if (!isNetworkBlocked && !isRegionBlocked
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
@@ -813,7 +818,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                         maxArea = (it.width * it.height)
                     }
                 }
-                biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height == "all" && it.width == "all" }?.apply {
+                biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height.equals("all", true) && it.width.equals("all", true) }?.apply {
                     height = biggestPubSize?.height.toString()
                     width = biggestPubSize?.width.toString()
                 }
@@ -857,7 +862,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
         val openRTB = sdkConfig?.openRTb!!
         val requestBody = prepareRequestBody(openRTB.request, adSize)
-        val loggingInterceptor = HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+        val loggingInterceptor = HttpLoggingInterceptor().setLevel(if (AndBeyondMedia.specialTag.isNullOrEmpty()) HttpLoggingInterceptor.Level.NONE else HttpLoggingInterceptor.Level.BODY)
         val client: OkHttpClient = OkHttpClient.Builder().addInterceptor(loggingInterceptor)
                 .connectTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS)
                 .writeTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS)

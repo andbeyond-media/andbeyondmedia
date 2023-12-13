@@ -63,6 +63,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private var bannerAdListener: BannerAdListener? = null
     private lateinit var viewState: Lifecycle.Event
     private var isRefreshLoaded = false
+    private var owBidSummary: Boolean? = null
+    private var owDebugState: Boolean? = null
+    private var owTestMode: Boolean? = null
 
     constructor(context: Context) : super(context) {
         init(context, null)
@@ -157,6 +160,37 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
+        fun callOpenRTb() {
+            log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}" }
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+                val newWebView = WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                }
+                log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
+                newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                binding.root.removeAllViews()
+                binding.root.addView(newWebView)
+            }
+        }
+
+        fun success() {
+            callOpenRTb()
+            adListener.onAdLoaded()
+            adListener.onAdImpression()
+            fallbackBanner.getScriptSource()?.let {
+                webView.loadData(it, "text/html; charset=utf-8", "UTF-8")
+            }
+            ad.setOnClickListener {
+                try {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackBanner.url ?: ""))
+                    context.startActivity(browserIntent)
+                } catch (_: Throwable) {
+                }
+                adListener.onAdClicked()
+            }
+        }
+
         fun sendFailure(error: String) {
             log { "Fallback for $currentAdUnit Failed with error : $error" }
             bannerManager.startUnfilledRefreshCounter()
@@ -164,11 +198,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 bannerAdListener?.onAdFailedToLoad(error, false)
             }
         }
+
         try {
             log { "Attach fallback for : $currentAdUnit" }
-            fallbackBanner.getScriptSource()?.let {
-                webView.loadData(it, "text/html; charset=utf-8", "UTF-8")
-            }
             Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
                     sendFailure(e?.message ?: "")
@@ -176,31 +208,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 }
 
                 override fun onResourceReady(resource: Drawable, model: Any, target: Target<Drawable>?, dataSource: DataSource, isFirstResource: Boolean): Boolean {
-                    adListener.onAdLoaded()
-                    adListener.onAdImpression()
+                    success()
                     return false
                 }
             }).into(ad)
         } catch (_: Throwable) {
             sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
-        }
-
-        ad.setOnClickListener {
-            try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackBanner.url ?: ""))
-                context.startActivity(browserIntent)
-            } catch (_: Throwable) {
-            }
-            adListener.onAdClicked()
-        }
-        bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
-            val newWebView = WebView(context).apply {
-                settings.javaScriptEnabled = true
-            }
-            newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-            newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
-            binding.root.removeAllViews()
-            binding.root.addView(newWebView)
         }
     }
 
@@ -236,6 +249,18 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     fun setAdListener(listener: BannerAdListener) {
         this.bannerAdListener = listener
+    }
+
+    fun enableTestMode(enabled: Boolean) {
+        this.owTestMode = enabled
+    }
+
+    fun enableDebugState(enabled: Boolean) {
+        this.owDebugState = enabled
+    }
+
+    fun enableBidSummary(enabled: Boolean) {
+        this.owBidSummary = enabled
     }
 
     override fun loadAd(request: AdRequest): Boolean {
@@ -317,6 +342,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             } ?: kotlin.run {
                 bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.PUBMATIC, banner, true) }
                 log { "load with pubmatic : $owAdUnitId" }
+                banner.adRequest.apply {
+                    owTestMode?.let { b -> enableTestMode(b) }
+                    owBidSummary?.let { b -> enableBidSummary(b) }
+                    owDebugState?.let { b -> enableDebugState(b) }
+                }
                 banner.loadAd()
             }
         }

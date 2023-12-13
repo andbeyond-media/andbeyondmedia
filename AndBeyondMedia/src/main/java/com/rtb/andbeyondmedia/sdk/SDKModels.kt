@@ -39,6 +39,8 @@ internal data class SDKConfig(
         val openWrapConfig: OpenWrapConfig? = null,
         @SerializedName("network_block")
         val networkBlock: String? = null,
+        @SerializedName("region_block")
+        val regionBlock: String? = null,
         @SerializedName("diff")
         val difference: Int? = null,
         @SerializedName("network")
@@ -424,4 +426,6 @@ data class CountryModel(
         val latitude: Double? = null,
         @SerializedName("longitude", alternate = ["lon"])
         val longitude: Double? = null,
+        @SerializedName("city")
+        val city: String? = null
 )
