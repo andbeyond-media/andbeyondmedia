@@ -403,10 +403,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 }
             }
             var isRegionBlocked = false
-            val blockedRegions = sdkConfig?.regionBlock?.replace(" ", "")?.split(",") ?: listOf()
-            if (blockedRegions.isNotEmpty() && sdkConfig?.countryStatus?.active == 1 && (!countrySetup.third?.city.isNullOrEmpty() || !countrySetup.third?.countryCode.isNullOrEmpty())) {
-                isRegionBlocked = blockedRegions.any { it.equals(countrySetup.third?.city, true) || it.equals(countrySetup.third?.countryCode, true) }
+            if (sdkConfig?.countryStatus?.active == 1 &&
+                    (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                            (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                            (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
+            ) {
+                isRegionBlocked = true
             }
+
             if (!isNetworkBlocked && !isRegionBlocked
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
@@ -634,8 +638,25 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
         val number = (1..100).random()
-        if ((firstLook && (number in 1..(bannerConfig.geoEdge?.firstLook ?: 0))) ||
-                (!firstLook && (number in 1..(bannerConfig.geoEdge?.other ?: 0)))) {
+        var firstLookPer = 0
+        var otherPer = 0
+        if (sdkConfig?.countryStatus?.active == 1 &&
+                (!sdkConfig?.geoEdge?.whitelistedRegions?.getCities().isNullOrEmpty()
+                        || !sdkConfig?.geoEdge?.whitelistedRegions?.getStates().isNullOrEmpty()
+                        || !sdkConfig?.geoEdge?.whitelistedRegions?.getCountries().isNullOrEmpty())
+        ) {
+            if (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                    (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                    (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true)) {
+                firstLookPer = bannerConfig.geoEdge?.firstLook ?: 0
+                otherPer = bannerConfig.geoEdge?.other ?: 0
+            }
+        } else {
+            firstLookPer = bannerConfig.geoEdge?.firstLook ?: 0
+            otherPer = bannerConfig.geoEdge?.other ?: 0
+        }
+
+        if ((firstLook && (number in 1..firstLookPer)) || (!firstLook && (number in 1..otherPer))) {
             callback()
         }
     }

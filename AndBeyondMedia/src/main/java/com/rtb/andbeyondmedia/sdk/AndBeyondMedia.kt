@@ -237,7 +237,7 @@ internal class CountryDetectionWorker(private val context: Context, params: Work
             } else {
                 val countryService = AndBeyondMedia.getCountryService(baseUrl)
                 val response = if (baseUrl.contains("apiip")) {
-                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode,latitude,longitude,city")).execute()
+                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode,latitude,longitude,city,regionCode")).execute()
                 } else {
                     countryService.getConfig().execute()
                 }

@@ -15,6 +15,7 @@ import com.rtb.andbeyondmedia.intersitial.InterstitialAd
 import com.rtb.andbeyondmedia.nativeformat.NativeAdManager
 import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondtest.databinding.ActivityMainBinding
 
@@ -174,24 +175,24 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         adaptiveAd?.destroyAd()
     }
 
-    override fun onAdClicked() {
+    override fun onAdClicked(bannerAdView: BannerAdView) {
     }
 
-    override fun onAdClosed() {
+    override fun onAdClosed(bannerAdView: BannerAdView) {
     }
 
-    override fun onAdFailedToLoad(error: String, retrying: Boolean) {
+    override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
         Log.d("Ads", "onAdFailedToLoad & Retrying $retrying")
     }
 
-    override fun onAdImpression() {
+    override fun onAdImpression(bannerAdView: BannerAdView) {
         Log.d("Ads", "onAdImpression: ")
     }
 
-    override fun onAdLoaded() {
+    override fun onAdLoaded(bannerAdView: BannerAdView) {
         Log.d("Ads", "onAdLoaded: ")
     }
 
-    override fun onAdOpened() {
+    override fun onAdOpened(bannerAdView: BannerAdView) {
     }
 }

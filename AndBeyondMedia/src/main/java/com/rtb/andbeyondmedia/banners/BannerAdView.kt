@@ -39,6 +39,7 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.dpToPx
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
@@ -195,7 +196,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             log { "Fallback for $currentAdUnit Failed with error : $error" }
             bannerManager.startUnfilledRefreshCounter()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(error, false)
+                bannerAdListener?.onAdFailedToLoad(this, ABMError(10, "No Fill"), false)
             }
         }
 
@@ -322,7 +323,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 adListener.onAdOpened()
             }
 
-            override fun onAdClicked(p0: POBBannerView) {
+            override fun onAppLeaving(p0: POBBannerView) {
                 adListener.onAdClicked()
             }
 
@@ -394,12 +395,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private val adListener = object : AdListener() {
         override fun onAdClicked() {
             super.onAdClicked()
-            bannerAdListener?.onAdClicked()
+            bannerAdListener?.onAdClicked(this@BannerAdView)
         }
 
         override fun onAdClosed() {
             super.onAdClosed()
-            bannerAdListener?.onAdClosed()
+            bannerAdListener?.onAdClosed(this@BannerAdView)
         }
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
@@ -425,7 +426,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 bannerManager.startUnfilledRefreshCounter()
             }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(p0.toString(), retryStatus)
+                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(p0.code, p0.message, p0.domain), retryStatus)
             }
         }
 
@@ -433,7 +434,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdImpression()
             bannerManager.adImpressed()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdImpression()
+                bannerAdListener?.onAdImpression(this@BannerAdView)
             }
             if (isRefreshLoaded) {
                 impressOnAdLooks()
@@ -444,7 +445,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdLoaded()
             log { "Ad loaded with unit : $currentAdUnit" }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdLoaded()
+                bannerAdListener?.onAdLoaded(this@BannerAdView)
             }
             bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
@@ -460,7 +461,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         override fun onAdOpened() {
-            bannerAdListener?.onAdOpened()
+            bannerAdListener?.onAdOpened(this@BannerAdView)
             super.onAdOpened()
         }
     }

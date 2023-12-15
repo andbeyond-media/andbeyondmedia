@@ -1,6 +1,7 @@
 package com.rtb.andbeyondmedia.sdk
 
 import com.google.android.gms.ads.AdSize
+import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
 
 internal interface BannerManagerListener {
@@ -14,18 +15,18 @@ internal interface BannerManagerListener {
 interface FullScreenContentCallback {
     fun onAdClicked()
     fun onAdDismissedFullScreenContent()
-    fun onAdFailedToShowFullScreenContent(error: String)
+    fun onAdFailedToShowFullScreenContent(error: ABMError)
     fun onAdImpression()
     fun onAdShowedFullScreenContent()
 }
 
 interface BannerAdListener {
-    fun onAdClicked()
-    fun onAdClosed()
-    fun onAdFailedToLoad(error: String, retrying: Boolean)
-    fun onAdImpression()
-    fun onAdLoaded()
-    fun onAdOpened()
+    fun onAdClicked(bannerAdView: BannerAdView)
+    fun onAdClosed(bannerAdView: BannerAdView)
+    fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean)
+    fun onAdImpression(bannerAdView: BannerAdView)
+    fun onAdLoaded(bannerAdView: BannerAdView)
+    fun onAdOpened(bannerAdView: BannerAdView)
 }
 
 fun interface OnShowAdCompleteListener {
@@ -34,5 +35,5 @@ fun interface OnShowAdCompleteListener {
 
 interface AdLoadCallback {
     fun onAdLoaded()
-    fun onAdFailedToLoad(error: String)
+    fun onAdFailedToLoad(error: ABMError)
 }

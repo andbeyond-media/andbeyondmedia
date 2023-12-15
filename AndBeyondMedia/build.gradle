@@ -45,7 +45,7 @@ dependencies {
     //noinspection GradleDependency
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.android.gms:play-services-ads:22.5.0"
+    implementation "com.google.android.gms:play-services-ads:22.6.0"
     implementation "com.squareup.okhttp3:okhttp:$okhttp"
     implementation "com.squareup.okhttp3:logging-interceptor:$okhttp"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit"
@@ -58,7 +58,7 @@ dependencies {
     implementation 'io.sentry:sentry-android:6.28.0'
     implementation 'com.amazon.android:aps-sdk:9.8.4'
     // To integrate OpenWrap SDK
-    implementation 'com.pubmatic.sdk:openwrap:3.3.0'
+    implementation 'com.pubmatic.sdk:openwrap:2.5.0'
 
     // To integrate GAM event handler
     implementation 'com.pubmatic.sdk:openwrap-eventhandler-dfp:3.0.0'

@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.rtb.andbeyondmedia.appopen.AppOpenAdManager
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.FullScreenContentCallback
 
@@ -42,7 +43,7 @@ class ThisApplication : Application() {
         override fun onAdDismissedFullScreenContent() {
         }
 
-        override fun onAdFailedToShowFullScreenContent(error: String) {
+        override fun onAdFailedToShowFullScreenContent(error: ABMError) {
         }
 
         override fun onAdImpression() {

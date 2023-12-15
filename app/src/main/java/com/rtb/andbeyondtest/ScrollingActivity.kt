@@ -3,7 +3,9 @@ package com.rtb.andbeyondtest
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondtest.databinding.ActivityScrollingBinding
 
@@ -22,25 +24,23 @@ class ScrollingActivity : AppCompatActivity() {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
         binding.bannerAd.setAdListener(object : BannerAdListener {
-            override fun onAdClicked() {
-
+            override fun onAdClicked(bannerAdView: BannerAdView) {
             }
 
-            override fun onAdClosed() {
+            override fun onAdClosed(bannerAdView: BannerAdView) {
             }
 
-            override fun onAdFailedToLoad(error: String, retrying: Boolean) {
+            override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
             }
 
-              override fun onAdImpression() {
-              }
+            override fun onAdImpression(bannerAdView: BannerAdView) {
+            }
 
-            override fun onAdLoaded() {
+            override fun onAdLoaded(bannerAdView: BannerAdView) {
                 Log.d("Ads", "fixed ad loaded: ")
             }
 
-            override fun onAdOpened() {
-
+            override fun onAdOpened(bannerAdView: BannerAdView) {
             }
 
         })
