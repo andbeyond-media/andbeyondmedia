@@ -34,6 +34,7 @@ import com.pubmatic.sdk.common.POBError
 import com.pubmatic.sdk.openwrap.banner.POBBannerView
 import com.pubmatic.sdk.openwrap.banner.POBBannerView.POBBannerViewListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler.DFPConfigListener
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -291,7 +292,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
 
-    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String): Boolean {
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPConfigListener? = null): Boolean {
         if (!this::currentAdUnit.isInitialized) return false
         if (this::adView.isInitialized) adView.destroy()
         if (this::pobBanner.isInitialized) pobBanner.destroy()
@@ -305,6 +306,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         val eventHandler = DFPBannerEventHandler(mContext, currentAdUnit, *currentAdSizes.toTypedArray())
+        configListener?.let { eventHandler.setConfigListener(configListener) }
         val banner = POBBannerView(mContext, pubID, profile, owAdUnitId, eventHandler)
         binding.root.removeAllViews()
         pobBanner = banner

@@ -22,6 +22,9 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAd
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAdLoadCallback
 import com.google.gson.Gson
+import com.pubmatic.sdk.common.POBError
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPInterstitialEventHandler
+import com.pubmatic.sdk.openwrap.interstitial.POBInterstitial
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
@@ -48,6 +51,83 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     init {
         sdkConfig = storeService.config
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+    }
+
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
+                   callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+        shouldSetConfig {
+            if (it) {
+                setConfig()
+                if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
+                    createRequest().getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack2)
+                    }
+                } else if (checkHijack(interstitialConfig.hijack)) {
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack2)
+                    }
+                } else {
+                    loadOW(pubID, profile, owAdUnitId, configListener, callBack1, callBack2, listener)
+                }
+            } else {
+                loadOW(pubID, profile, owAdUnitId, configListener, callBack1, callBack2, listener)
+            }
+        }
+    }
+
+    private fun loadOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
+                       callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+        val eventHandler = DFPInterstitialEventHandler(context, adUnit)
+        configListener?.let { eventHandler.setConfigListener(it) }
+        val interstitial = POBInterstitial(context, pubID, profile, owAdUnitId, eventHandler)
+        interstitial.setListener(object : POBInterstitial.POBInterstitialListener() {
+            override fun onAdFailedToShow(p0: POBInterstitial, p1: POBError) {
+                listener.onAdFailedToShow(p0, p1)
+            }
+
+            override fun onAppLeaving(p0: POBInterstitial) {
+                listener.onAppLeaving(p0)
+            }
+
+            override fun onAdOpened(p0: POBInterstitial) {
+                listener.onAdOpened(p0)
+            }
+
+            override fun onAdClosed(p0: POBInterstitial) {
+                listener.onAdClosed(p0)
+            }
+
+            override fun onAdClicked(p0: POBInterstitial) {
+                listener.onAdClicked(p0)
+            }
+
+            override fun onAdExpired(p0: POBInterstitial) {
+                listener.onAdExpired(p0)
+            }
+
+            override fun onAdReceived(p0: POBInterstitial) {
+                interstitialConfig.retryConfig = sdkConfig?.retryConfig
+                addGeoEdge(AdSdk.PUBMATIC, p0, otherUnit)
+                callBack1(p0)
+                onAdReceived(p0)
+                firstLook = false
+            }
+
+            override fun onAdFailedToLoad(p0: POBInterstitial, p1: POBError) {
+                onAdFailedToLoad(p0, p1)
+                Logger.ERROR.log(msg = p1.errorMessage)
+                val tempStatus = firstLook
+                if (firstLook) {
+                    firstLook = false
+                }
+                try {
+                    adFailedToLoad(tempStatus, callBack2)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                    callBack1(null)
+                }
+            }
+        })
     }
 
     fun load(adRequest: AdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
@@ -93,7 +173,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             AdManagerInterstitialAd.load(context, adUnit, finalRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
                     interstitialConfig.retryConfig = sdkConfig?.retryConfig
-                    addGeoEdge(interstitialAd, otherUnit)
+                    addGeoEdge(AdSdk.GAM, interstitialAd, otherUnit)
                     callBack(interstitialAd)
                     firstLook = false
                 }
@@ -115,12 +195,11 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         }
     }
 
-    private fun addGeoEdge(interstitialAd: AdManagerInterstitialAd, otherUnit: Boolean) {
+    private fun addGeoEdge(sdk: AdSdk, interstitialAd: Any, otherUnit: Boolean) {
         try {
             val number = (1..100).random()
-            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
-                    (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
-                AppHarbr.addInterstitial(AdSdk.GAM, interstitialAd, object : AHIncident {
+            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) || (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
+                AppHarbr.addInterstitial(sdk, interstitialAd, object : AHIncident {
                     override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
                         log { "Interstitial : onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
                     }
