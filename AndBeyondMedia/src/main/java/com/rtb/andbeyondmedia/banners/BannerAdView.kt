@@ -46,6 +46,9 @@ import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.Locale
@@ -140,8 +143,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         adView.adUnitId = adUnitId
         adView.adListener = adListener
         videoOptions?.let { adView.setVideoOptions(it) }
-        binding.root.removeAllViews()
-        binding.root.addView(adView)
+        try {
+            binding.root.removeAllViews()
+            binding.root.addView(adView)
+        } catch (_: Throwable) {
+        }
         log { "attachAdView : $adUnitId" }
     }
 
@@ -161,7 +167,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
+    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}" }
             bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
@@ -197,7 +203,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             log { "Fallback for $currentAdUnit Failed with error : $error" }
             bannerManager.startUnfilledRefreshCounter()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(this, ABMError(10, "No Fill"), false)
+                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(10, "No Fill"), false)
             }
         }
 
@@ -377,15 +383,18 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    fun impressOnAdLooks() {
+    fun impressOnAdLooks() = CoroutineScope(Dispatchers.Main).launch {
         bannerManager.attachScript(currentAdUnit, adView.adSize)?.let {
-            val webView = WebView(context).apply {
-                settings.javaScriptEnabled = true
-                layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
-                loadData(it, "text/html; charset=utf-8", "UTF-8")
+            try {
+                val webView = WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
+                    loadData(it, "text/html; charset=utf-8", "UTF-8")
+                }
+                log { "Adunit $currentAdUnit impressed on adlooks" }
+                binding.root.addView(webView)
+            } catch (_: Throwable) {
             }
-            log { "Adunit $currentAdUnit impressed on adlooks" }
-            binding.root.addView(webView)
         }
     }
 

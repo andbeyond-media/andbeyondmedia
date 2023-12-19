@@ -90,15 +90,15 @@ internal data class SDKConfig(
             private val countries: String? = null
     ) {
         fun getCities(): List<String> {
-            return cities?.replace(" ", "")?.split(",") ?: listOf()
+            return cities?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
         }
 
         fun getStates(): List<String> {
-            return states?.replace(" ", "")?.split(",") ?: listOf()
+            return states?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
         }
 
         fun getCountries(): List<String> {
-            return countries?.replace(" ", "")?.split(",") ?: listOf()
+            return countries?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
         }
     }
 

@@ -5,7 +5,9 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondtest.databinding.BoxLayoutBinding
 
@@ -18,27 +20,25 @@ class BoxAdapter(private val context: Context, private val boxes: List<String>) 
         val tempPost = position
         holder.binding.bannerAd.loadAd(AdRequest().Builder().build())
         holder.binding.bannerAd.setAdListener(object : BannerAdListener {
-            override fun onAdClicked() {
-
+            override fun onAdClicked(bannerAdView: BannerAdView) {
             }
 
-            override fun onAdClosed() {
+            override fun onAdClosed(bannerAdView: BannerAdView) {
             }
 
-            override fun onAdFailedToLoad(error: String, retrying: Boolean) {
+            override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
                 Log.d("Ads", "$tempPost onAdFailedToLoad: $retrying , $error")
             }
 
-            override fun onAdImpression() {
+            override fun onAdImpression(bannerAdView: BannerAdView) {
                 Log.d("Ads", "$tempPost onAdImpression: ")
             }
 
-            override fun onAdLoaded() {
+            override fun onAdLoaded(bannerAdView: BannerAdView) {
                 Log.d("Ads", "$tempPost onAdLoaded: ")
             }
 
-            override fun onAdOpened() {
-
+            override fun onAdOpened(bannerAdView: BannerAdView) {
             }
 
         })

@@ -25,6 +25,9 @@ import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -269,7 +272,7 @@ internal object SDKManager {
         initializeOpenWrap(config.openWrapConfig)
     }
 
-    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
+    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) = CoroutineScope(Dispatchers.Main).launch {
         PrebidMobile.setPbsDebug(prebid?.debug == 1)
         PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
