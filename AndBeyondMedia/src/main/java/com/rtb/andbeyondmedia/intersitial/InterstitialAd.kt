@@ -30,6 +30,18 @@ class InterstitialAd(private val context: Activity, private val adUnit: String) 
         this.listener = listener
     }
 
+    fun enableTestMode(enabled: Boolean) {
+        interstitialAdManager.owTestMode = enabled
+    }
+
+    fun enableDebugState(enabled: Boolean) {
+        interstitialAdManager.owDebugState = enabled
+    }
+
+    fun enableBidSummary(enabled: Boolean) {
+        interstitialAdManager.owBidSummary = enabled
+    }
+
     fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener? = null) {
         interstitialAdManager.loadWithOW(pubID, profile, owAdUnitId, configListener, {
             pobInterstitial = it

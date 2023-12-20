@@ -27,6 +27,15 @@ internal fun log(getMessage: () -> String) {
     }
 }
 
+internal fun String?.log(getMessage: () -> String) {
+    if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
+        try {
+            Log.i(AndBeyondMedia.specialTag, String.format("%s~ %s", this, getMessage()))
+        } catch (_: Throwable) {
+        }
+    }
+}
+
 internal fun View?.log(getMessage: () -> String) {
     if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
         try {
