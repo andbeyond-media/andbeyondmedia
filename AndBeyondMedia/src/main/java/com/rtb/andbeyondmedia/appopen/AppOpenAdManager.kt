@@ -13,6 +13,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AdLoadCallback
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
@@ -100,7 +101,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                     adFailedToLoad(context, tempStatus, adLoadCallback)
                 } catch (e: Throwable) {
                     e.printStackTrace()
-                    adLoadCallback?.onAdFailedToLoad(loadAdError.message)
+                    adLoadCallback?.onAdFailedToLoad(ABMError(loadAdError.code, loadAdError.message, loadAdError.domain))
                 }
             }
         })
@@ -116,7 +117,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             if (firstLook) {
                 requestAd()
             } else {
-                adLoadCallback?.onAdFailedToLoad("")
+                adLoadCallback?.onAdFailedToLoad(ABMError(10))
                 if ((appOpenConfig.retryConfig?.retries ?: 0) > 0) {
                     appOpenConfig.retryConfig?.retries = (appOpenConfig.retryConfig?.retries ?: 0) - 1
                     Handler(Looper.getMainLooper()).postDelayed({
@@ -133,7 +134,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
                 }
             }
         } else {
-            adLoadCallback?.onAdFailedToLoad("")
+            adLoadCallback?.onAdFailedToLoad(ABMError(10))
         }
     }
 
@@ -237,7 +238,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             }
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                fullScreenContentCallback?.onAdFailedToShowFullScreenContent(adError.message)
+                fullScreenContentCallback?.onAdFailedToShowFullScreenContent(ABMError(adError.code, adError.message))
                 Logger.ERROR.log(msg = adError.message)
                 appOpenAd = null
                 isShowingAd = false
@@ -266,7 +267,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         if (context is Activity) {
             load(context, adLoadCallback)
         } else {
-            adLoadCallback.onAdFailedToLoad("")
+            adLoadCallback.onAdFailedToLoad(ABMError(10))
         }
     }
 }

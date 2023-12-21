@@ -34,16 +34,21 @@ import com.pubmatic.sdk.common.POBError
 import com.pubmatic.sdk.openwrap.banner.POBBannerView
 import com.pubmatic.sdk.openwrap.banner.POBBannerView.POBBannerViewListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler.DFPConfigListener
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.dpToPx
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.Locale
@@ -138,8 +143,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         adView.adUnitId = adUnitId
         adView.adListener = adListener
         videoOptions?.let { adView.setVideoOptions(it) }
-        binding.root.removeAllViews()
-        binding.root.addView(adView)
+        try {
+            binding.root.removeAllViews()
+            binding.root.addView(adView)
+        } catch (_: Throwable) {
+        }
         log { "attachAdView : $adUnitId" }
     }
 
@@ -159,7 +167,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) {
+    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}" }
             bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
@@ -195,7 +203,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             log { "Fallback for $currentAdUnit Failed with error : $error" }
             bannerManager.startUnfilledRefreshCounter()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(error, false)
+                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(10, "No Fill"), false)
             }
         }
 
@@ -290,7 +298,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
 
-    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String): Boolean {
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPConfigListener? = null): Boolean {
         if (!this::currentAdUnit.isInitialized) return false
         if (this::adView.isInitialized) adView.destroy()
         if (this::pobBanner.isInitialized) pobBanner.destroy()
@@ -304,6 +312,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         val eventHandler = DFPBannerEventHandler(mContext, currentAdUnit, *currentAdSizes.toTypedArray())
+        configListener?.let { eventHandler.setConfigListener(configListener) }
         val banner = POBBannerView(mContext, pubID, profile, owAdUnitId, eventHandler)
         binding.root.removeAllViews()
         pobBanner = banner
@@ -322,7 +331,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 adListener.onAdOpened()
             }
 
-            override fun onAdClicked(p0: POBBannerView) {
+            override fun onAppLeaving(p0: POBBannerView) {
                 adListener.onAdClicked()
             }
 
@@ -374,15 +383,18 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    fun impressOnAdLooks() {
+    fun impressOnAdLooks() = CoroutineScope(Dispatchers.Main).launch {
         bannerManager.attachScript(currentAdUnit, adView.adSize)?.let {
-            val webView = WebView(context).apply {
-                settings.javaScriptEnabled = true
-                layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
-                loadData(it, "text/html; charset=utf-8", "UTF-8")
+            try {
+                val webView = WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
+                    loadData(it, "text/html; charset=utf-8", "UTF-8")
+                }
+                log { "Adunit $currentAdUnit impressed on adlooks" }
+                binding.root.addView(webView)
+            } catch (_: Throwable) {
             }
-            log { "Adunit $currentAdUnit impressed on adlooks" }
-            binding.root.addView(webView)
         }
     }
 
@@ -394,12 +406,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private val adListener = object : AdListener() {
         override fun onAdClicked() {
             super.onAdClicked()
-            bannerAdListener?.onAdClicked()
+            bannerAdListener?.onAdClicked(this@BannerAdView)
         }
 
         override fun onAdClosed() {
             super.onAdClosed()
-            bannerAdListener?.onAdClosed()
+            bannerAdListener?.onAdClosed(this@BannerAdView)
         }
 
         override fun onAdFailedToLoad(p0: LoadAdError) {
@@ -425,7 +437,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 bannerManager.startUnfilledRefreshCounter()
             }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(p0.toString(), retryStatus)
+                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(p0.code, p0.message, p0.domain), retryStatus)
             }
         }
 
@@ -433,7 +445,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdImpression()
             bannerManager.adImpressed()
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdImpression()
+                bannerAdListener?.onAdImpression(this@BannerAdView)
             }
             if (isRefreshLoaded) {
                 impressOnAdLooks()
@@ -444,7 +456,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdLoaded()
             log { "Ad loaded with unit : $currentAdUnit" }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdLoaded()
+                bannerAdListener?.onAdLoaded(this@BannerAdView)
             }
             bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
             if (firstLook) {
@@ -460,7 +472,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         override fun onAdOpened() {
-            bannerAdListener?.onAdOpened()
+            bannerAdListener?.onAdOpened(this@BannerAdView)
             super.onAdOpened()
         }
     }

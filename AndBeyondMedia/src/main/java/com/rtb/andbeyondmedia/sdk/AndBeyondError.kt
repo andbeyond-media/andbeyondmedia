@@ -1,8 +1,11 @@
 package com.rtb.andbeyondmedia.sdk
 
+import androidx.annotation.Keep
 import com.google.android.gms.ads.AdError
 
 /** Convenience factory class to create AdError objects for custom events.  */
+
+@Keep
 object AndBeyondError {
     const val SAMPLE_SDK_DOMAIN = "com.google.android.gms.ads"
     const val CUSTOM_EVENT_ERROR_DOMAIN = "com.rtb.andbeyondmedia.adapter"

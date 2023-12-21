@@ -5,6 +5,7 @@ import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.ServerSideVerificationOptions
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.FullScreenContentCallback
 import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.log
@@ -51,7 +52,7 @@ class RewardedInterstitialAd(private val context: Activity, private val adUnit: 
             override fun onAdFailedToShowFullScreenContent(p0: AdError) {
                 super.onAdFailedToShowFullScreenContent(p0)
                 mInterstitialRewardedAd = null
-                callback.onAdFailedToShowFullScreenContent(p0.toString())
+                callback.onAdFailedToShowFullScreenContent(ABMError(p0.code, p0.message))
             }
 
             override fun onAdImpression() {

@@ -25,6 +25,9 @@ import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -156,6 +159,7 @@ internal object EventHelper {
         Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
         SentryAndroid.init(context) { options ->
             options.environment = context.packageName
+            options.isAttachAnrThreadDump = true
             options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
             options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
         }
@@ -237,7 +241,7 @@ internal class CountryDetectionWorker(private val context: Context, params: Work
             } else {
                 val countryService = AndBeyondMedia.getCountryService(baseUrl)
                 val response = if (baseUrl.contains("apiip")) {
-                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode,latitude,longitude,city")).execute()
+                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode,latitude,longitude,city,regionCode")).execute()
                 } else {
                     countryService.getConfig().execute()
                 }
@@ -268,7 +272,7 @@ internal object SDKManager {
         initializeOpenWrap(config.openWrapConfig)
     }
 
-    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) {
+    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) = CoroutineScope(Dispatchers.Main).launch {
         PrebidMobile.setPbsDebug(prebid?.debug == 1)
         PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
         PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")

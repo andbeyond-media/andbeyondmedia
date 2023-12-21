@@ -22,13 +22,19 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAd
 import com.google.android.gms.ads.admanager.AdManagerInterstitialAdLoadCallback
 import com.google.gson.Gson
+import com.pubmatic.sdk.common.POBError
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPInterstitialEventHandler
+import com.pubmatic.sdk.openwrap.interstitial.POBInterstitial
+import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
-import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.prebid.mobile.InterstitialAdUnit
 import org.prebid.mobile.Signals
 import org.prebid.mobile.VideoParameters
@@ -44,10 +50,99 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
     private var otherUnit = false
+    var owBidSummary: Boolean? = null
+    var owDebugState: Boolean? = null
+    var owTestMode: Boolean? = null
 
     init {
         sdkConfig = storeService.config
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+    }
+
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
+                   callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+        shouldSetConfig {
+            if (it) {
+                setConfig()
+                if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
+                    adUnit.log { "new unit override on $adUnit" }
+                    createRequest().getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack2)
+                    }
+                } else if (checkHijack(interstitialConfig.hijack)) {
+                    adUnit.log { "hijack override on $adUnit" }
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack2)
+                    }
+                } else {
+                    loadOW(pubID, profile, owAdUnitId, configListener, callBack1, callBack2, listener)
+                }
+            } else {
+                loadOW(pubID, profile, owAdUnitId, configListener, callBack1, callBack2, listener)
+            }
+        }
+    }
+
+    private fun loadOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
+                       callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+        adUnit.log { "loading $adUnit by Pubmatic with pub id : $pubID, profile : $profile, owUnit : $owAdUnitId" }
+        val eventHandler = DFPInterstitialEventHandler(context, adUnit)
+        configListener?.let { eventHandler.setConfigListener(it) }
+        val interstitial = POBInterstitial(context, pubID, profile, owAdUnitId, eventHandler)
+        interstitial.setListener(object : POBInterstitial.POBInterstitialListener() {
+            override fun onAdFailedToShow(p0: POBInterstitial, p1: POBError) {
+                listener.onAdFailedToShow(p0, p1)
+            }
+
+            override fun onAppLeaving(p0: POBInterstitial) {
+                listener.onAppLeaving(p0)
+            }
+
+            override fun onAdOpened(p0: POBInterstitial) {
+                listener.onAdOpened(p0)
+            }
+
+            override fun onAdClosed(p0: POBInterstitial) {
+                listener.onAdClosed(p0)
+            }
+
+            override fun onAdClicked(p0: POBInterstitial) {
+                listener.onAdClicked(p0)
+            }
+
+            override fun onAdExpired(p0: POBInterstitial) {
+                listener.onAdExpired(p0)
+            }
+
+            override fun onAdReceived(p0: POBInterstitial) {
+                adUnit.log { "loaded $adUnit by pubmatic" }
+                interstitialConfig.retryConfig = sdkConfig?.retryConfig
+                addGeoEdge(AdSdk.PUBMATIC, p0, otherUnit)
+                callBack1(p0)
+                listener.onAdReceived(p0)
+                firstLook = false
+            }
+
+            override fun onAdFailedToLoad(p0: POBInterstitial, p1: POBError) {
+                adUnit.log { "loading $adUnit failed by pubmatic with error : ${p1.errorMessage}" }
+                val tempStatus = firstLook
+                if (firstLook) {
+                    firstLook = false
+                }
+                try {
+                    adFailedToLoad(tempStatus, callBack2)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                    callBack1(null)
+                }
+            }
+        })
+        interstitial.adRequest?.apply {
+            owTestMode?.let { b -> enableTestMode(b) }
+            owBidSummary?.let { b -> enableBidSummary(b) }
+            owDebugState?.let { b -> enableDebugState(b) }
+        }
+        interstitial.loadAd()
     }
 
     fun load(adRequest: AdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
@@ -60,11 +155,13 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             if (it) {
                 setConfig()
                 if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
+                    adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
                 } else if (checkHijack(interstitialConfig.hijack)) {
+                    adUnit.log { "hijack override on $adUnit" }
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
@@ -89,17 +186,19 @@ internal class InterstitialAdManager(private val context: Activity, private val 
 
     private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
         otherUnit = adUnit != this.adUnit
+        this.adUnit.log { "loading $adUnit by GAM" }
         fetchDemand(adRequest) { finalRequest ->
             AdManagerInterstitialAd.load(context, adUnit, finalRequest, object : AdManagerInterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: AdManagerInterstitialAd) {
+                    this@InterstitialAdManager.adUnit.log { "loaded $adUnit by GAM" }
                     interstitialConfig.retryConfig = sdkConfig?.retryConfig
-                    addGeoEdge(interstitialAd, otherUnit)
+                    addGeoEdge(AdSdk.GAM, interstitialAd, otherUnit)
                     callBack(interstitialAd)
                     firstLook = false
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    Logger.ERROR.log(msg = adError.message)
+                    this@InterstitialAdManager.adUnit.log { "loading $adUnit failed by GAM with error : ${adError.message}" }
                     val tempStatus = firstLook
                     if (firstLook) {
                         firstLook = false
@@ -115,18 +214,17 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         }
     }
 
-    private fun addGeoEdge(interstitialAd: AdManagerInterstitialAd, otherUnit: Boolean) {
+    private fun addGeoEdge(sdk: AdSdk, interstitialAd: Any, otherUnit: Boolean) {
         try {
             val number = (1..100).random()
-            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
-                    (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
-                AppHarbr.addInterstitial(AdSdk.GAM, interstitialAd, object : AHIncident {
+            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) || (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
+                AppHarbr.addInterstitial(sdk, interstitialAd, object : AHIncident {
                     override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
-                        log { "Interstitial : onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
+                        adUnit.log { "Interstitial : onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
                     }
 
                     override fun onAdIncident(p0: Any?, p1: String?, p2: AdSdk?, p3: String?, p4: AdFormat, p5: Array<out AdBlockReason>, reportReasons: Array<out AdBlockReason>) {
-                        log { "Interstitial: onAdIncident : ${Gson().toJson(reportReasons.asList().map { it.reason })}" }
+                        adUnit.log { "Interstitial: onAdIncident : ${Gson().toJson(reportReasons.asList().map { it.reason })}" }
                     }
                 })
             }
@@ -136,39 +234,45 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(interstitialConfig.unFilled)} && Retry config : ${Gson().toJson(interstitialConfig.retryConfig)}" }
         fun requestAd() {
             createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
             }
         }
-        if (interstitialConfig.unFilled?.status == 1) {
-            if (firstLook) {
-                requestAd()
-            } else {
-                if ((interstitialConfig.retryConfig?.retries ?: 0) > 0) {
-                    interstitialConfig.retryConfig?.retries = (interstitialConfig.retryConfig?.retries ?: 0) - 1
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        interstitialConfig.retryConfig?.adUnits?.firstOrNull()?.let {
-                            interstitialConfig.retryConfig?.adUnits?.removeAt(0)
-                            overridingUnit = it
-                            requestAd()
-                        } ?: kotlin.run {
-                            overridingUnit = null
-                            callBack(null)
-                        }
-                    }, (interstitialConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+        if (shouldBeActive) {
+            if (interstitialConfig.unFilled?.status == 1) {
+                if (firstLook) {
+                    requestAd()
                 } else {
-                    overridingUnit = null
-                    callBack(null)
+                    if ((interstitialConfig.retryConfig?.retries ?: 0) > 0) {
+                        interstitialConfig.retryConfig?.retries = (interstitialConfig.retryConfig?.retries ?: 0) - 1
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            interstitialConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                                interstitialConfig.retryConfig?.adUnits?.removeAt(0)
+                                overridingUnit = it
+                                requestAd()
+                            } ?: kotlin.run {
+                                overridingUnit = null
+                                callBack(null)
+                            }
+                        }, (interstitialConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                    } else {
+                        overridingUnit = null
+                        callBack(null)
+                    }
                 }
+            } else {
+                callBack(null)
             }
+
         } else {
             callBack(null)
         }
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    private fun shouldSetConfig(callback: (Boolean) -> Unit) {
+    private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
@@ -193,6 +297,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun setConfig() {
+        adUnit.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive) return
         if (sdkConfig?.getBlockList()?.contains(adUnit) == true) {
             shouldBeActive = false
@@ -215,6 +320,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
             format = validConfig.format
         }
+        adUnit.log { "setConfig :$interstitialConfig" }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
@@ -310,7 +416,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
             }
         }
 
-        log { "Fetch Demand with aps : $apsAvailable and with prebid : $prebidAvailable" }
+        adUnit.log { "Fetch Demand with aps : $apsAvailable and with prebid : $prebidAvailable" }
         if (apsAvailable && prebidAvailable) {
             aps(true)
         } else if (apsAvailable) {

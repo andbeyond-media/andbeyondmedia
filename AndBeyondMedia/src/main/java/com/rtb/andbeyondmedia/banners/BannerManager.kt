@@ -403,10 +403,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 }
             }
             var isRegionBlocked = false
-            val blockedRegions = sdkConfig?.regionBlock?.replace(" ", "")?.split(",") ?: listOf()
-            if (blockedRegions.isNotEmpty() && sdkConfig?.countryStatus?.active == 1 && (!countrySetup.third?.city.isNullOrEmpty() || !countrySetup.third?.countryCode.isNullOrEmpty())) {
-                isRegionBlocked = blockedRegions.any { it.equals(countrySetup.third?.city, true) || it.equals(countrySetup.third?.countryCode, true) }
+            if (sdkConfig?.countryStatus?.active == 1 &&
+                    (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                            (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                            (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
+            ) {
+                isRegionBlocked = true
             }
+
             if (!isNetworkBlocked && !isRegionBlocked
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
@@ -483,6 +487,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun startUnfilledRefreshCounter() {
+        activeTimeCounter?.cancel()
+        passiveTimeCounter?.cancel()
         val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
         if (time <= 0) return
         unfilledRefreshCounter?.cancel()
@@ -495,8 +501,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 refresh(0, true, fixedUnit = sdkConfig?.unfilledTimerConfig?.unit)
             }
         }
-        activeTimeCounter?.cancel()
-        passiveTimeCounter?.cancel()
         unfilledRefreshCounter?.start()
     }
 
@@ -589,6 +593,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
         addCustomTargeting("visible", isForegroundRefresh.toString())
         addCustomTargeting("min_view", (if (bannerConfig.isVisibleFor > 10) 10 else bannerConfig.isVisibleFor).toString())
+        addCustomTargeting("sdk_version", BuildConfig.ADAPTER_VERSION)
         if (unfilled) addCustomTargeting("retry", "1")
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
@@ -634,8 +639,25 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun checkGeoEdge(firstLook: Boolean, callback: () -> Unit) {
         val number = (1..100).random()
-        if ((firstLook && (number in 1..(bannerConfig.geoEdge?.firstLook ?: 0))) ||
-                (!firstLook && (number in 1..(bannerConfig.geoEdge?.other ?: 0)))) {
+        var firstLookPer = 0
+        var otherPer = 0
+        if (sdkConfig?.countryStatus?.active == 1 &&
+                (!sdkConfig?.geoEdge?.whitelistedRegions?.getCities().isNullOrEmpty()
+                        || !sdkConfig?.geoEdge?.whitelistedRegions?.getStates().isNullOrEmpty()
+                        || !sdkConfig?.geoEdge?.whitelistedRegions?.getCountries().isNullOrEmpty())
+        ) {
+            if (sdkConfig?.geoEdge?.whitelistedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                    (sdkConfig?.geoEdge?.whitelistedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                    (sdkConfig?.geoEdge?.whitelistedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true)) {
+                firstLookPer = bannerConfig.geoEdge?.firstLook ?: 0
+                otherPer = bannerConfig.geoEdge?.other ?: 0
+            }
+        } else {
+            firstLookPer = bannerConfig.geoEdge?.firstLook ?: 0
+            otherPer = bannerConfig.geoEdge?.other ?: 0
+        }
+
+        if ((firstLook && (number in 1..firstLookPer)) || (!firstLook && (number in 1..otherPer))) {
             callback()
         }
     }
