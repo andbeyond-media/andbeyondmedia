@@ -27,6 +27,7 @@ import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.connectionAvailable
+import com.rtb.andbeyondmedia.common.getCountry
 import com.rtb.andbeyondmedia.common.getDeviceId
 import com.rtb.andbeyondmedia.common.getLocation
 import com.rtb.andbeyondmedia.common.getUniqueId
@@ -980,7 +981,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             geo["lat"] = it.latitude ?: 0.0
             geo["lon"] = it.longitude ?: 0.0
             geo["type"] = 2
-            geo["country"] = it.countryCode ?: ""
+            geo["country"] = getCountry(it.countryCode ?: "")
             geo["city"] = it.city ?: ""
             geo["region"] = it.state ?: ""
             geo["ipservice"] = 4
