@@ -882,6 +882,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
         if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 100)) return
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
+        view.log { "Will call open rtb for : ${adSize.width}*${adSize.height}" }
         val openRTB = sdkConfig?.openRTb!!
         val requestBody = prepareRequestBody(openRTB.request, adSize)
         val loggingInterceptor = HttpLoggingInterceptor().setLevel(if (AndBeyondMedia.specialTag.isNullOrEmpty()) HttpLoggingInterceptor.Level.NONE else HttpLoggingInterceptor.Level.BODY)
@@ -975,12 +976,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
             geo["lat"] = it.latitude
             geo["lon"] = it.longitude
             geo["type"] = 1
-            geo["country"] = "IN"
         } ?: countrySetup.third?.let {
             geo["lat"] = it.latitude ?: 0.0
             geo["lon"] = it.longitude ?: 0.0
             geo["type"] = 2
             geo["country"] = it.countryCode ?: ""
+            geo["city"] = it.city ?: ""
+            geo["region"] = it.state ?: ""
+            geo["ipservice"] = 4
         }
         val request = demoRequest.replace("{id}", uniqueId)
                 .replace("{name}", context.packageName.replace(".", ""))
@@ -1003,6 +1006,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{type}", connectionType)
                 .replace("{ext}", Gson().toJson(ext))
                 .replace("{geo}", Gson().toJson(geo))
+                .replace("{ip}", countrySetup.third?.ip ?: "")
 
         return request.toRequestBody()
     }
