@@ -450,5 +450,7 @@ data class CountryModel(
         @SerializedName("city")
         val city: String? = null,
         @SerializedName("regionCode", alternate = ["state"])
-        val state: String? = null
+        val state: String? = null,
+        @SerializedName("ip")
+        val ip: String? = null
 )
