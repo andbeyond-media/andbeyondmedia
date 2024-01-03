@@ -3,6 +3,8 @@ package com.rtb.andbeyondmedia.banners
 import android.app.Activity
 import android.content.Context
 import android.graphics.Point
+import android.location.Address
+import android.location.Location
 import android.net.ConnectivityManager
 import android.os.Build
 import android.os.CountDownTimer
@@ -21,12 +23,14 @@ import com.amazon.device.ads.DTBAdSize
 import com.amazon.device.ads.DTBAdUtil
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdapterResponseInfo
+import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.gson.Gson
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.connectionAvailable
+import com.rtb.andbeyondmedia.common.getAddress
 import com.rtb.andbeyondmedia.common.getCountry
 import com.rtb.andbeyondmedia.common.getDeviceId
 import com.rtb.andbeyondmedia.common.getLocation
@@ -81,6 +85,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var adType: String = ""
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
+    private var userLocation = Pair<Location?, Address?>(null, null)
 
     init {
         sdkConfig = storeService.config
@@ -282,7 +287,19 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun setCountryConfig() {
-        if (sdkConfig?.countryStatus?.active != 1) return
+        if (sdkConfig?.countryStatus?.active != 1) {
+            if ((sdkConfig?.openRTb?.percentage ?: 0) != 0 && (userLocation.first == null || (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null))) {
+                context.getLocation()?.let {
+                    userLocation = userLocation.copy(first = it)
+                    if (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null) {
+                        context.getAddress(it) { a ->
+                            userLocation = userLocation.copy(second = a)
+                        }
+                    }
+                }
+            }
+            return
+        }
         if (!countrySetup.first || countrySetup.second || countrySetup.third == null || countrySetup.third?.countryCode.isNullOrEmpty() || sdkConfig?.homeCountry?.contains(countrySetup.third?.countryCode ?: "IN", true) == true) return
         bannerConfig = bannerConfig.apply {
             instantRefresh = sdkConfig?.instantRefresh
@@ -885,7 +902,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
         view.log { "Will call open rtb for : ${adSize.width}*${adSize.height}" }
         val openRTB = sdkConfig?.openRTb!!
-        val requestBody = prepareRequestBody(openRTB.request, adSize)
+        val requestBody = prepareRequestBody(openRTB, adSize)
         val loggingInterceptor = HttpLoggingInterceptor().setLevel(if (AndBeyondMedia.specialTag.isNullOrEmpty()) HttpLoggingInterceptor.Level.NONE else HttpLoggingInterceptor.Level.BODY)
         val client: OkHttpClient = OkHttpClient.Builder().addInterceptor(loggingInterceptor)
                 .connectTimeout((openRTB.timeout ?: 1000).toLong(), TimeUnit.MILLISECONDS)
@@ -920,7 +937,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
         })
     }
 
-    private fun prepareRequestBody(demoRequest: String?, adSize: AdSize): RequestBody {
+    private fun prepareRequestBody(openRTBConfig: SDKConfig.OpenRTBConfig, adSize: AdSize): RequestBody {
+        val demoRequest = openRTBConfig.request
         if (demoRequest.isNullOrEmpty()) return "".toRequestBody()
         val uniqueId = getUniqueId()
         val heightWidth = try {
@@ -969,15 +987,15 @@ internal class BannerManager(private val context: Context, private val bannerLis
             ""
         }
         val ext = hashMapOf<String, String>()
+        var schain = ""
         sdkConfig?.prebid?.extParams?.forEach {
             ext[it.key ?: ""] = it.value ?: ""
+            if (it.key == "schain") {
+                schain = it.value ?: ""
+            }
         }
         val geo = HashMap<String, Any>()
-        context.getLocation()?.let {
-            geo["lat"] = it.latitude
-            geo["lon"] = it.longitude
-            geo["type"] = 1
-        } ?: countrySetup.third?.let {
+        countrySetup.third?.let {
             geo["lat"] = it.latitude ?: 0.0
             geo["lon"] = it.longitude ?: 0.0
             geo["type"] = 2
@@ -985,6 +1003,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
             geo["city"] = it.city ?: ""
             geo["region"] = it.state ?: ""
             geo["ipservice"] = 4
+        } ?: userLocation.first?.let {
+            geo["lat"] = it.latitude
+            geo["lon"] = it.longitude
+            geo["type"] = 1
+            geo["country"] = getCountry(userLocation.second?.countryCode ?: "")
         }
         val request = demoRequest.replace("{id}", uniqueId)
                 .replace("{name}", context.packageName.replace(".", ""))
@@ -993,6 +1016,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{storeurl}", sdkConfig?.prebid?.storeURL ?: "")
                 .replace("{version}", BuildConfig.ADAPTER_VERSION)
                 .replace("{sizes}", Gson().toJson(arrayListOf(hashMapOf("w" to adSize.width, "h" to adSize.height))))
+                .replace("{bh}", adSize.height.toString())
+                .replace("{bw}", adSize.width.toString())
+                .replace("{sdkver}", MobileAds.getVersion().toString())
                 .replace("{os}", "Android")
                 .replace("{osv}", Build.VERSION.RELEASE)
                 .replace("{ifa}", context.getDeviceId())
@@ -1008,7 +1034,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{ext}", Gson().toJson(ext))
                 .replace("{geo}", Gson().toJson(geo))
                 .replace("{ip}", countrySetup.third?.ip ?: "")
-
+                .replace("{tagid}", openRTBConfig.tagId ?: "")
+                .replace("{pubid}", openRTBConfig.pubId ?: "")
+                .replace("{schain}", schain)
         return request.toRequestBody()
     }
 

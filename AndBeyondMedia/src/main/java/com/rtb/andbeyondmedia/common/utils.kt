@@ -2,6 +2,9 @@ package com.rtb.andbeyondmedia.common
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.location.Address
+import android.location.Geocoder
+import android.location.Location
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
@@ -9,6 +12,11 @@ import android.os.Build
 import android.provider.Settings
 import android.util.TypedValue
 import androidx.annotation.Keep
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.Random
 
 fun Context.connectionAvailable(): Boolean? {
@@ -51,6 +59,23 @@ fun Context.getLocation() = try {
     locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
 } catch (e: Throwable) {
     null
+}
+
+@Suppress("DEPRECATION")
+fun Context.getAddress(location: Location, callback: (Address?) -> Unit) {
+    try {
+        val geocoder = Geocoder(applicationContext, Locale.getDefault())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            geocoder.getFromLocation(location.latitude, location.longitude, 1) { callback(it.getOrNull(0)) }
+        } else {
+            CoroutineScope(Dispatchers.IO).launch {
+                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                withContext(Dispatchers.Main) { callback(addresses?.getOrNull(0)) }
+            }
+        }
+    } catch (_: Throwable) {
+        callback(null)
+    }
 }
 
 @Keep

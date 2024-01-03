@@ -261,6 +261,12 @@ internal data class SDKConfig(
             val percentage: Int? = null,
             @SerializedName("timeout")
             val timeout: Int? = null,
+            @SerializedName("tagid")
+            val tagId: String? = null,
+            @SerializedName("pubid")
+            val pubId: String? = null,
+            @SerializedName("geocode")
+            val geoCode: Int? = null,
             @SerializedName("url")
             val url: String? = null,
             @SerializedName("headers")
