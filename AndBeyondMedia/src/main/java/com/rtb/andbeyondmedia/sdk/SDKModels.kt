@@ -1,9 +1,7 @@
 package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
-import com.amazon.aps.ads.Aps
 import com.google.gson.annotations.SerializedName
-import org.prebid.mobile.rendering.bidding.data.bid.Prebid
 
 @Keep
 internal data class SDKConfig(
@@ -261,6 +259,12 @@ internal data class SDKConfig(
             val percentage: Int? = null,
             @SerializedName("timeout")
             val timeout: Int? = null,
+            @SerializedName("tagid")
+            val tagId: String? = null,
+            @SerializedName("pubid")
+            val pubId: String? = null,
+            @SerializedName("geocode")
+            val geoCode: Int? = null,
             @SerializedName("url")
             val url: String? = null,
             @SerializedName("headers")
@@ -451,6 +455,8 @@ data class CountryModel(
         val city: String? = null,
         @SerializedName("regionCode", alternate = ["state"])
         val state: String? = null,
+        @SerializedName("zip", alternate = ["postalCode"])
+        val zip: String? = null,
         @SerializedName("ip")
         val ip: String? = null
 )
