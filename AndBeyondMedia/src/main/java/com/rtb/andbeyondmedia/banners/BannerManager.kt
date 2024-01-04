@@ -1002,10 +1002,13 @@ internal class BannerManager(private val context: Context, private val bannerLis
             geo["country"] = getCountry(it.countryCode ?: "")
             geo["city"] = it.city ?: ""
             geo["region"] = it.state ?: ""
+            geo["zip"] = it.zip ?: ""
             geo["ipservice"] = 4
         } ?: userLocation.first?.let {
             geo["lat"] = it.latitude
             geo["lon"] = it.longitude
+            geo["city"] = userLocation.second?.locality ?: ""
+            geo["zip"] = userLocation.second?.postalCode ?: ""
             geo["type"] = 1
             geo["country"] = getCountry(userLocation.second?.countryCode ?: "")
         }
