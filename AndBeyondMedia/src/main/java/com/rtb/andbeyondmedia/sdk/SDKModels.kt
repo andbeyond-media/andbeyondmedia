@@ -2,6 +2,7 @@ package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
+import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 
 @Keep
 internal data class SDKConfig(
@@ -63,6 +64,8 @@ internal data class SDKConfig(
         val minViewRtb: Int? = null,
         @SerializedName("config")
         val refreshConfig: List<RefreshConfig>? = null,
+        @SerializedName("silent_interstitial_config")
+        val silentInterstitialConfig: SilentInterstitialConfig? = null,
         @SerializedName("block")
         private val block: List<List<String>?>? = null,
         @SerializedName("halt")

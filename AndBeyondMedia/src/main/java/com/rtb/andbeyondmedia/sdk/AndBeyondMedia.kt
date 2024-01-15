@@ -19,6 +19,8 @@ import com.pubmatic.sdk.common.OpenWrapSDK
 import com.pubmatic.sdk.common.models.POBApplicationInfo
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
+import com.rtb.andbeyondmedia.intersitial.SilentInterstitial
+import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
 import com.rtb.andbeyondmedia.sdk.EventHelper.shouldHandle
 import io.sentry.Sentry
@@ -52,6 +54,7 @@ object AndBeyondMedia {
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
+    private var silentInterstitial: SilentInterstitial? = null
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         attachEventHandler(context)
@@ -126,6 +129,7 @@ object AndBeyondMedia {
                     if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
                         fetchCountry(context, config.countryStatus.url)
                     }
+                    checkForSilentInterstitial(context, config?.silentInterstitialConfig)
                     SDKManager.initialize(context)
                     if (config?.refetch != null) {
                         fetchConfig(context, storeService.config?.refetch)
@@ -148,6 +152,23 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
         } catch (e: Throwable) {
             e.stackTrace
+        }
+    }
+
+    private fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?) {
+        if (silentInterstitial != null) {
+            if (silentInterstitialConfig == null) {
+                silentInterstitial?.stop()
+            }
+            return
+        }
+        if (silentInterstitialConfig == null) {
+            return
+        }
+        val number = (1..100).random()
+        if (number in 1..(silentInterstitialConfig.activePercentage ?: 0)) {
+            silentInterstitial = SilentInterstitial(context)
+            silentInterstitial?.start()
         }
     }
 }
