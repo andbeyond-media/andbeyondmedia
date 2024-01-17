@@ -81,7 +81,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
-    private var refreshBlocked = false
+    internal var refreshBlocked = false
     private var adType: String = ""
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config

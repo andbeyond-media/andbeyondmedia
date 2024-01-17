@@ -1,5 +1,6 @@
 package com.rtb.andbeyondmedia.sdk
 
+import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
@@ -54,7 +55,7 @@ object AndBeyondMedia {
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
-    private var silentInterstitial: SilentInterstitial? = null
+    private var silentInterstitial = SilentInterstitial()
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         attachEventHandler(context)
@@ -155,20 +156,18 @@ object AndBeyondMedia {
         }
     }
 
+    fun registerActivity(activity: Activity) {
+        silentInterstitial.registerActivity(activity)
+    }
+
     private fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?) {
-        if (silentInterstitial != null) {
-            if (silentInterstitialConfig == null) {
-                silentInterstitial?.stop()
-            }
-            return
-        }
         if (silentInterstitialConfig == null) {
+            silentInterstitial.destroy()
             return
         }
         val number = (1..100).random()
         if (number in 1..(silentInterstitialConfig.activePercentage ?: 0)) {
-            silentInterstitial = SilentInterstitial(context)
-            silentInterstitial?.start()
+            silentInterstitial.init(context)
         }
     }
 }

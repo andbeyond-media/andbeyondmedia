@@ -10,7 +10,7 @@ class BannerAdSize(var adSize: AdSize) {
     companion object {
         val BANNER = BannerAdSize(AdSize.BANNER)
         val FULL_BANNER = BannerAdSize(AdSize.FULL_BANNER)
-        val LARGE_BANNER = BannerAdSize(AdSize.FULL_BANNER)
+        val LARGE_BANNER = BannerAdSize(AdSize.LARGE_BANNER)
         val LEADERBOARD = BannerAdSize(AdSize.LEADERBOARD)
         val MEDIUM_RECTANGLE = BannerAdSize(AdSize.MEDIUM_RECTANGLE)
 

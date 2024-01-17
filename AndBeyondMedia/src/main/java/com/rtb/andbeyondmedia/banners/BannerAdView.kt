@@ -42,6 +42,7 @@ import com.rtb.andbeyondmedia.common.dpToPx
 import com.rtb.andbeyondmedia.databinding.BannerAdViewBinding
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondError
+import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.Fallback
@@ -121,6 +122,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
+    internal fun blockRefresh() {
+        bannerManager.refreshBlocked = true
+    }
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
         if (this::adView.isInitialized) adView.destroy()
@@ -486,6 +490,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             if (lifecycle == null) {
                 lifecycle = (mContext as? AppCompatActivity)?.lifecycle
+            }
+            (mContext as? AppCompatActivity)?.let {
+                AndBeyondMedia.registerActivity(it)
             }
 
             lifecycle?.addObserver(object : LifecycleEventObserver {

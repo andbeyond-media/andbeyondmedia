@@ -29,15 +29,11 @@ internal data class InterstitialConfig(
 @Keep
 internal data class SilentInterstitialConfig(
         @SerializedName("active")
-        val activePercentage: Int? = null,
+        var activePercentage: Int? = null,
         @SerializedName("adunit")
-        val adunit: String? = null,
+        var adunit: String? = null,
         @SerializedName("custom")
-        val custom: Int? = null,
+        var custom: Int? = null,
         @SerializedName("timer")
-        val timer: Int? = null,
-        @SerializedName("retry_config")
-        val retryConfig: SDKConfig.RetryConfig? = null,
-        @SerializedName("placement")
-        val placement: SDKConfig.Placement? = null,
+        var timer: Int? = null,
 )
