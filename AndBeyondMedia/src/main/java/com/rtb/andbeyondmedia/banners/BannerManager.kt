@@ -81,7 +81,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private val storeService = AndBeyondMedia.getStoreService(context)
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
-    internal var refreshBlocked = false
+    private var refreshBlocked = false
+    internal var isInter = false
     private var adType: String = ""
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
@@ -409,7 +410,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adLoaded(firstLook: Boolean, loadedUnit: String, loadedAdapter: AdapterResponseInfo?) {
         adImpressed()
         setCountryConfig()
-        if (sdkConfig?.switch == 1 && !refreshBlocked) {
+        if (sdkConfig?.switch == 1 && !refreshBlocked && !isInter) {
             overridingUnit = null
             bannerConfig.retryConfig = sdkConfig?.retryConfig
             unfilledRefreshCounter?.cancel()
@@ -534,7 +535,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     add(AdSize.FLUID)
                 }
             })
-            loadAd(active, unfilled)
+            loadAd(active, unfilled, instantRefresh)
         }
 
         val differenceOfLastRefresh = ceil((currentTimeStamp - bannerConfig.lastRefreshAt).toDouble() / 1000.00).toInt()
@@ -604,7 +605,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
-    private fun createRequest(active: Int, unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
+    private fun createRequest(active: Int,
+                              unfilled: Boolean = false,
+                              hijacked: Boolean = false,
+                              instant: Boolean = false,
+                              newUnit: Boolean = false) = AdRequest().Builder().apply {
         addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
@@ -614,15 +619,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         addCustomTargeting("sdk_version", BuildConfig.ADAPTER_VERSION)
         if (unfilled) addCustomTargeting("retry", "1")
         if (hijacked) addCustomTargeting("hijack", "1")
+        if (isInter) addCustomTargeting("instl", "1")
+        if (instant) addCustomTargeting("instant", "1")
+        if (newUnit) addCustomTargeting("new_unit", "1")
     }.build()
 
-    private fun loadAd(active: Int, unfilled: Boolean) {
+    private fun loadAd(active: Int, unfilled: Boolean, instant: Boolean) {
         if (bannerConfig.refreshCount < 10) {
             bannerConfig.refreshCount++
         } else {
             bannerConfig.refreshCount = 10
         }
-        bannerListener.loadAd(createRequest(active, unfilled))
+        bannerListener.loadAd(createRequest(active = active, unfilled = unfilled, instant = instant))
     }
 
     fun checkOverride(): AdManagerAdRequest? {
@@ -633,7 +641,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     add(AdSize.FLUID)
                 }
             })
-            return createRequest(1).getAdRequest()
+            return createRequest(active = 1, newUnit = true).getAdRequest()
         } else if (checkHijack(bannerConfig.hijack)) {
             view.log { "checkOverride on ${bannerConfig.publisherAdUnit}, status : hijack" }
             bannerListener.attachAdView(getAdUnitName(unfilled = false, hijacked = true, newUnit = false), bannerConfig.adSizes.apply {
@@ -641,7 +649,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     add(AdSize.FLUID)
                 }
             })
-            return createRequest(1, hijacked = true).getAdRequest()
+            return createRequest(active = 1, hijacked = true).getAdRequest()
         }
         return null
     }
@@ -696,6 +704,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
             if ((sdkConfig?.aps?.retry ?: 0) == 0) {
                 apsAvailable = false
             }
+        }
+        if (sdkConfig?.prebid?.whitelistedFormats != null && sdkConfig?.prebid?.whitelistedFormats?.contains(AdTypes.BANNER) == false) {
+            prebidAvailable = false
+        }
+        if (sdkConfig?.aps?.whitelistedFormats != null && sdkConfig?.aps?.whitelistedFormats?.contains(AdTypes.BANNER) == false) {
+            apsAvailable = false
         }
 
         fun prebid(apsRequestBuilder: AdManagerAdRequest.Builder? = null) = bannerConfig.placement?.let {
@@ -898,7 +912,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit) {
         if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
-        if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 100)) return
+        if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 0)) return
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
         view.log { "Will call open rtb for : ${adSize.width}*${adSize.height}" }
         val openRTB = sdkConfig?.openRTb!!
@@ -929,7 +943,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
                                 onResponse(Pair(imageUrl, scriptUrl))
                             }
                         }
-                    } catch (_: Throwable) {
+                    } catch (t: Throwable) {
+                        view.log { "Could not parse openRTB response because : ${t.localizedMessage}" }
                     }
                 }
             }
@@ -1040,6 +1055,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{tagid}", openRTBConfig.tagId ?: "")
                 .replace("{pubid}", openRTBConfig.pubId ?: "")
                 .replace("{schain}", schain)
+                .replace("{instl}", (if (isInter) 1 else 0).toString())
         return request.toRequestBody()
     }
 

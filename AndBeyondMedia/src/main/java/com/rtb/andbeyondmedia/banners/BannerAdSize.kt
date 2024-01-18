@@ -13,6 +13,7 @@ class BannerAdSize(var adSize: AdSize) {
         val LARGE_BANNER = BannerAdSize(AdSize.LARGE_BANNER)
         val LEADERBOARD = BannerAdSize(AdSize.LEADERBOARD)
         val MEDIUM_RECTANGLE = BannerAdSize(AdSize.MEDIUM_RECTANGLE)
+        val FLUID = BannerAdSize(AdSize.FLUID)
 
         fun getCurrentOrientationAnchoredAdaptiveBannerAdSize(context: Context, width: Int): BannerAdSize {
             return BannerAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, width))

@@ -122,8 +122,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
-    internal fun blockRefresh() {
-        bannerManager.refreshBlocked = true
+    internal fun makeInter() {
+        bannerManager.isInter = true
     }
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
@@ -173,7 +173,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     @SuppressLint("SetJavaScriptEnabled")
     private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
-            log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}" }
+            log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
             bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
                 val newWebView = WebView(context).apply {
                     settings.javaScriptEnabled = true

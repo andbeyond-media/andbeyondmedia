@@ -29,11 +29,15 @@ internal data class InterstitialConfig(
 @Keep
 internal data class SilentInterstitialConfig(
         @SerializedName("active")
-        var activePercentage: Int? = null,
+        val activePercentage: Int? = null,
         @SerializedName("adunit")
-        var adunit: String? = null,
+        val adunit: String? = null,
         @SerializedName("custom")
-        var custom: Int? = null,
+        val custom: Int? = null,
         @SerializedName("timer")
-        var timer: Int? = null,
+        val timer: Int? = null,
+        @SerializedName("close_delay")
+        val closeDelay: Int? = null,
+        @SerializedName("sizes")
+        val bannerSizes: List<SDKConfig.Size>? = null
 )

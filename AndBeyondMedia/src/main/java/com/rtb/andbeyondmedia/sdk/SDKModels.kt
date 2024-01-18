@@ -200,7 +200,9 @@ internal data class SDKConfig(
             @SerializedName("key_values")
             val extParams: List<KeyValuePair>? = null,
             @SerializedName("banner_api_parameters")
-            val bannerAPIParameters: List<Int>? = null
+            val bannerAPIParameters: List<Int>? = null,
+            @SerializedName("whitelisted_formats")
+            val whitelistedFormats: List<String>? = null
     ) {
         @Keep
         data class KeyValuePair(
@@ -227,7 +229,9 @@ internal data class SDKConfig(
             @SerializedName("location")
             val location: Int? = null,
             @SerializedName("slots")
-            val slots: List<Slot>? = null
+            val slots: List<Slot>? = null,
+            @SerializedName("whitelisted_formats")
+            val whitelistedFormats: List<String>? = null
     ) {
         @Keep
         data class Slot(

@@ -3,6 +3,7 @@ package com.rtb.andbeyondmedia.intersitial
 import android.app.Activity
 import android.content.Context
 import android.os.CountDownTimer
+import android.view.View
 import android.view.Window
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -29,6 +30,7 @@ internal class SilentInterstitial {
     private var sdkConfig: SDKConfig? = null
     private var interstitialConfig: SilentInterstitialConfig = SilentInterstitialConfig()
     private var activeTimeCounter: CountDownTimer? = null
+    private var closeDelayTimer: CountDownTimer? = null
     private var started: Boolean = false
     private var banner: BannerAdView? = null
     private var timerSeconds = 0
@@ -60,6 +62,7 @@ internal class SilentInterstitial {
     fun destroy() {
         started = false
         activeTimeCounter?.cancel()
+        closeDelayTimer?.cancel()
     }
 
     private fun resumeCounter() {
@@ -148,8 +151,8 @@ internal class SilentInterstitial {
     private fun loadCustomInterstitial() = findContext()?.let { activity ->
         tag.log { "Loading banner with unit ${interstitialConfig.adunit}" }
         banner?.destroyAd()
-        banner = BannerAdView(activity).also { it.blockRefresh() }
-        banner?.setAdSizes(BannerAdSize.LEADERBOARD, BannerAdSize.LARGE_BANNER, BannerAdSize.FULL_BANNER)
+        banner = BannerAdView(activity).also { it.makeInter() }
+        banner?.setAdSizes(*getBannerSizes().toTypedArray())
         banner?.setAdUnitID(interstitialConfig.adunit ?: "")
         banner?.setAdListener(object : BannerAdListener {
             override fun onAdClicked(bannerAdView: BannerAdView) {
@@ -193,10 +196,36 @@ internal class SilentInterstitial {
             dialog?.findViewById<ImageButton>(R.id.close_ad)?.setOnClickListener {
                 dialog?.dismiss()
             }
+            closeDelayTimer?.cancel()
+            closeDelayTimer = object : CountDownTimer((interstitialConfig.closeDelay ?: 0).toLong(), 1000) {
+                override fun onTick(millisUntilFinished: Long) {}
+
+                override fun onFinish() {
+                    dialog?.findViewById<ImageButton>(R.id.close_ad)?.visibility = View.VISIBLE
+                }
+            }
+            closeDelayTimer?.start()
             dialog?.show()
         } catch (e: Throwable) {
             tag.log { "Custom ad could not show because : ${e.localizedMessage}" }
         }
+    }
+
+    private fun getBannerSizes(): List<BannerAdSize> {
+        val temp = arrayListOf<BannerAdSize>()
+        interstitialConfig.bannerSizes?.forEach {
+            if (it.height.equals("fluid", true) || it.width.equals("fluid", true)) {
+                temp.add(BannerAdSize.FLUID)
+            }
+            if (it.height?.toIntOrNull() != null && it.width?.toIntOrNull() != null) {
+                temp.add(BannerAdSize(width = it.width.toIntOrNull() ?: 300, height = it.height.toIntOrNull() ?: 250))
+            }
+        }
+
+        if (temp.isEmpty()) {
+            temp.add(BannerAdSize.MEDIUM_RECTANGLE)
+        }
+        return temp
     }
 
 }
