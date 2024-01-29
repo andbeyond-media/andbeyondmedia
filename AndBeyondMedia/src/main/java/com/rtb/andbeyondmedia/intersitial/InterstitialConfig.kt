@@ -24,7 +24,10 @@ internal data class InterstitialConfig(
         var placement: SDKConfig.Placement? = null,
         @SerializedName("format")
         var format: String? = null
-)
+) {
+        @Keep
+        fun isNewUnitApplied() = isNewUnit && newUnit?.status == 1
+}
 
 @Keep
 internal data class SilentInterstitialConfig(

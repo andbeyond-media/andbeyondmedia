@@ -5,11 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
-import com.appharbr.sdk.engine.AdBlockReason
-import com.appharbr.sdk.engine.AdSdk
-import com.appharbr.sdk.engine.AppHarbr
-import com.appharbr.sdk.engine.adformat.AdFormat
-import com.appharbr.sdk.engine.listeners.AHIncident
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.LoadAdError
@@ -17,6 +12,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.gson.Gson
+import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
@@ -25,6 +21,9 @@ import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.prebid.mobile.NativeAdUnit
 import org.prebid.mobile.NativeDataAsset
 import org.prebid.mobile.NativeEventTracker
@@ -75,12 +74,14 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (nativeConfig.isNewUnit && nativeConfig.newUnit?.status == 1) {
+                if (nativeConfig.isNewUnitApplied()) {
+                    adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
                     }
                 } else if (checkHijack(nativeConfig.hijack)) {
+                    adUnit.log { "hijack override on $adUnit" }
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
@@ -105,11 +106,11 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
 
     private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (nativeAd: NativeAd?) -> Unit) {
         otherUnit = adUnit != this.adUnit
+        this.adUnit.log { "loading $adUnit by Native" }
         fetchDemand(adRequest) {
             adLoader = AdLoader.Builder(context, adUnit)
                     .forNativeAd { nativeAd: NativeAd ->
                         nativeConfig.retryConfig = sdkConfig?.retryConfig
-                        addGeoEdge(nativeAd, otherUnit)
                         callBack(nativeAd)
                         firstLook = false
                     }
@@ -164,33 +165,40 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     }
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (nativeAd: NativeAd?) -> Unit, adError: LoadAdError) {
+        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)}" }
         fun requestAd() {
+            nativeConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
             }
         }
-        if (nativeConfig.unFilled?.status == 1) {
-            if (firstLook) {
-                requestAd()
-            } else {
-                if ((nativeConfig.retryConfig?.retries ?: 0) > 0) {
-                    nativeConfig.retryConfig?.retries = (nativeConfig.retryConfig?.retries ?: 0) - 1
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        nativeConfig.retryConfig?.adUnits?.firstOrNull()?.let {
-                            nativeConfig.retryConfig?.adUnits?.removeAt(0)
-                            overridingUnit = it
-                            requestAd()
-                        } ?: kotlin.run {
-                            overridingUnit = null
-                            callBack(null)
-                            adListener?.onAdFailedToLoad(adError)
-                        }
-                    }, (nativeConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+        if (shouldBeActive) {
+            if (nativeConfig.unFilled?.status == 1) {
+                if (firstLook && !nativeConfig.isNewUnitApplied()) {
+                    requestAd()
                 } else {
-                    overridingUnit = null
-                    callBack(null)
-                    adListener?.onAdFailedToLoad(adError)
+                    if ((nativeConfig.retryConfig?.retries ?: 0) > 0) {
+                        nativeConfig.retryConfig?.retries = (nativeConfig.retryConfig?.retries ?: 0) - 1
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            nativeConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                                nativeConfig.retryConfig?.adUnits?.removeAt(0)
+                                overridingUnit = it
+                                requestAd()
+                            } ?: kotlin.run {
+                                overridingUnit = null
+                                callBack(null)
+                                adListener?.onAdFailedToLoad(adError)
+                            }
+                        }, (nativeConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                    } else {
+                        overridingUnit = null
+                        callBack(null)
+                        adListener?.onAdFailedToLoad(adError)
+                    }
                 }
+            } else {
+                callBack(null)
+                adListener?.onAdFailedToLoad(adError)
             }
         } else {
             callBack(null)
@@ -198,28 +206,8 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         }
     }
 
-    private fun addGeoEdge(nativeAd: NativeAd, otherUnit: Boolean) {
-        try {
-            val number = (1..100).random()
-            if ((!otherUnit && (number in 1..(sdkConfig?.geoEdge?.firstLook ?: 0))) ||
-                    (otherUnit && (number in 1..(sdkConfig?.geoEdge?.other ?: 0)))) {
-                AppHarbr.addInterstitial(AdSdk.GAM, nativeAd, object : AHIncident {
-                    override fun onAdBlocked(p0: Any?, p1: String?, p2: AdFormat, reasons: Array<out AdBlockReason>) {
-                        log { "Native : onAdBlocked : ${Gson().toJson(reasons.asList().map { it.reason })}" }
-                    }
-
-                    override fun onAdIncident(p0: Any?, p1: String?, p2: AdSdk?, p3: String?, p4: AdFormat, p5: Array<out AdBlockReason>, reportReasons: Array<out AdBlockReason>) {
-                        log { "Native: onAdIncident : ${Gson().toJson(reportReasons.asList().map { it.reason })}" }
-                    }
-                })
-            }
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
-    }
-
     @Suppress("UNNECESSARY_SAFE_CALL")
-    private fun shouldSetConfig(callback: (Boolean) -> Unit) {
+    private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
@@ -244,6 +232,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     }
 
     private fun setConfig() {
+        adUnit.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive) return
         if (sdkConfig?.getBlockList()?.contains(adUnit) == true) {
             shouldBeActive = false
@@ -265,6 +254,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
             hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
         }
+        adUnit.log { "setConfig :$nativeConfig" }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
@@ -280,7 +270,16 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
 
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
-        if ((!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)) {
+        if (sdkConfig?.prebid?.whitelistedFormats != null && sdkConfig?.prebid?.whitelistedFormats?.contains(AdTypes.NATIVE) == false) {
+            callback()
+            return
+        }
+
+        if ((nativeConfig.isNewUnitApplied() && sdkConfig?.prebid?.other == 1) ||
+                (otherUnit && !nativeConfig.isNewUnitApplied() && sdkConfig?.prebid?.retry == 1) ||
+                (!otherUnit && sdkConfig?.prebid?.firstLook == 1)
+        ) {
+            adUnit.log { "Fetch Demand with prebid" }
             val adUnit = NativeAdUnit((if (otherUnit) nativeConfig.placement?.other ?: 0 else nativeConfig.placement?.firstLook ?: 0).toString())
             adUnit.setContextType(NativeAdUnit.CONTEXT_TYPE.SOCIAL_CENTRIC)
             adUnit.setPlacementType(NativeAdUnit.PLACEMENTTYPE.CONTENT_FEED)

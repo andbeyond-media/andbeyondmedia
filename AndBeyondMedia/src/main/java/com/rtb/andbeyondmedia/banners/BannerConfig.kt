@@ -63,4 +63,7 @@ internal data class BannerConfig(
         var geoEdge: SDKConfig.GeoEdge? = null,
         @SerializedName("native_fallback")
         var nativeFallback: Int? = null
-)
+) {
+    @Keep
+    fun isNewUnitApplied() = isNewUnit && newUnit?.status == 1
+}

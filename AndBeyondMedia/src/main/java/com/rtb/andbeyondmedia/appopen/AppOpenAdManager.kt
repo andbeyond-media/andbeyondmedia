@@ -11,6 +11,8 @@ import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.gson.Gson
+import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.ABMError
@@ -21,9 +23,12 @@ import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.OnShowAdCompleteListener
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Date
 
-class AppOpenAdManager(private val context: Context, adUnit: String?) {
+class AppOpenAdManager(private val context: Context, private val adUnit: String?) {
     private var appOpenAd: AppOpenAd? = null
     private var isLoadingAd = false
     private var loadTime: Long = 0
@@ -50,12 +55,14 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (appOpenConfig.isNewUnit && appOpenConfig.newUnit?.status == 1) {
+                if (appOpenConfig.isNewUnitApplied()) {
+                    adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = false, newUnit = true), adManagerAdRequest, adLoadCallback)
                     }
                 } else if (checkHijack(appOpenConfig.hijack)) {
+                    adUnit.log { "hijack override on $adUnit" }
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
                         loadAd(context, getAdUnitName(false, hijacked = true, newUnit = false), adManagerAdRequest, adLoadCallback)
@@ -80,9 +87,10 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
 
     private fun loadAd(context: Context, adUnit: String, adRequest: AdManagerAdRequest, adLoadCallback: AdLoadCallback?) {
         isLoadingAd = true
+        this.adUnit.log { "loading $adUnit by App open" }
         AppOpenAd.load(context, adUnit, adRequest, object : AppOpenAd.AppOpenAdLoadCallback() {
             override fun onAdLoaded(ad: AppOpenAd) {
-                Logger.INFO.log(msg = "AppOpen ad loaded")
+                this@AppOpenAdManager.adUnit.log { "loaded $adUnit by App open" }
                 appOpenAd = ad
                 isLoadingAd = false
                 loadTime = Date().time
@@ -91,7 +99,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                Logger.ERROR.log(msg = loadAdError.message)
+                this@AppOpenAdManager.adUnit.log { "loading $adUnit failed by App open with error : ${loadAdError.message}" }
                 isLoadingAd = false
                 val tempStatus = firstLook
                 if (firstLook) {
@@ -108,39 +116,47 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
     }
 
     private fun adFailedToLoad(context: Context, firstLook: Boolean, adLoadCallback: AdLoadCallback?) {
+        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(appOpenConfig.unFilled)} && Retry config : ${Gson().toJson(appOpenConfig.retryConfig)}" }
+
         fun requestAd() {
+            appOpenConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(context, getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, adLoadCallback)
             }
         }
-        if (appOpenConfig.unFilled?.status == 1) {
-            if (firstLook) {
-                requestAd()
+        if (shouldBeActive) {
+            if (appOpenConfig.unFilled?.status == 1) {
+                if (firstLook && !appOpenConfig.isNewUnitApplied()) {
+                    requestAd()
+                } else {
+                    adLoadCallback?.onAdFailedToLoad(ABMError(10))
+                    if ((appOpenConfig.retryConfig?.retries ?: 0) > 0) {
+                        appOpenConfig.retryConfig?.retries = (appOpenConfig.retryConfig?.retries ?: 0) - 1
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            appOpenConfig.retryConfig?.adUnits?.firstOrNull()?.let {
+                                appOpenConfig.retryConfig?.adUnits?.removeAt(0)
+                                overridingUnit = it
+                                requestAd()
+                            } ?: kotlin.run {
+                                overridingUnit = null
+                            }
+                        }, (appOpenConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
+                    } else {
+                        overridingUnit = null
+                    }
+                }
             } else {
                 adLoadCallback?.onAdFailedToLoad(ABMError(10))
-                if ((appOpenConfig.retryConfig?.retries ?: 0) > 0) {
-                    appOpenConfig.retryConfig?.retries = (appOpenConfig.retryConfig?.retries ?: 0) - 1
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        appOpenConfig.retryConfig?.adUnits?.firstOrNull()?.let {
-                            appOpenConfig.retryConfig?.adUnits?.removeAt(0)
-                            overridingUnit = it
-                            requestAd()
-                        } ?: kotlin.run {
-                            overridingUnit = null
-                        }
-                    }, (appOpenConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
-                } else {
-                    overridingUnit = null
-                }
             }
         } else {
             adLoadCallback?.onAdFailedToLoad(ABMError(10))
         }
+
     }
 
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    private fun shouldSetConfig(callback: (Boolean) -> Unit) {
+    private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
@@ -165,6 +181,7 @@ class AppOpenAdManager(private val context: Context, adUnit: String?) {
     }
 
     private fun setConfig() {
+        adUnit.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive) return
         if (sdkConfig?.getBlockList()?.contains(loadingAdUnit) == true) {
             shouldBeActive = false
