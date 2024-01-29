@@ -435,8 +435,12 @@ data class Fallback(
             var width: String? = null,
             @SerializedName("height")
             var height: String? = null,
+            @SerializedName("type")
+            val type: String? = null,
             @SerializedName("image")
             val image: String? = null,
+            @SerializedName("script")
+            val script: String? = null,
             @SerializedName("url")
             val url: String? = null,
             @SerializedName("tag")

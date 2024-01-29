@@ -6,7 +6,10 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.AttributeSet
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -157,21 +160,82 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun attachFallback(fallbackBanner: Fallback.Banner) {
-        val imageView = ImageView(context)
         val webView = WebView(context).apply {
             settings.javaScriptEnabled = true
+            layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
         }
-        imageView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-        webView.layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
-        imageView.scaleType = ImageView.ScaleType.FIT_XY
+        val imageView = ImageView(context).apply {
+            layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+            scaleType = ImageView.ScaleType.FIT_XY
+        }
+        val scriptWebView = WebView(context).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+        }
         binding.root.removeAllViews()
-        binding.root.addView(imageView)
+        if (fallbackBanner.type == null || fallbackBanner.type.equals("image", true)) {
+            binding.root.addView(imageView)
+            loadFallbackImageAd(imageView, webView, fallbackBanner)
+        } else {
+            binding.root.addView(scriptWebView)
+            loadFallbackWebAd(scriptWebView, webView, fallbackBanner)
+        }
         binding.root.addView(webView)
-        loadFallbackAd(imageView, webView, fallbackBanner)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun loadFallbackAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
+    private fun loadFallbackWebAd(scriptWebView: WebView, tagView: WebView, fallbackBanner: Fallback.Banner) {
+        fun callOpenRTb() {
+            log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+                val newWebView = WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                }
+                log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
+                newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                binding.root.removeAllViews()
+                binding.root.addView(newWebView)
+            }
+        }
+
+        fun success() {
+            callOpenRTb()
+            adListener.onAdLoaded()
+            adListener.onAdImpression()
+            fallbackBanner.getScriptSource()?.let {
+                tagView.loadData(it, "text/html; charset=utf-8", "UTF-8")
+            }
+        }
+
+        fun sendFailure(error: String) {
+            log { "Fallback for $currentAdUnit Failed with error : $error" }
+            bannerManager.startUnfilledRefreshCounter()
+            if (bannerManager.allowCallback(isRefreshLoaded)) {
+                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(10, "No Fill"), false)
+            }
+        }
+        try {
+            log { "Attach fallback web for : $currentAdUnit" }
+            scriptWebView.webViewClient = object : WebViewClient() {
+
+                override fun onPageFinished(view: WebView, url: String) {
+                    success()
+                }
+
+                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                    sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
+                }
+            }
+            scriptWebView.loadData(fallbackBanner.script ?: "", "text/html; charset=utf-8", "UTF-8")
+        } catch (e: Throwable) {
+            sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun loadFallbackImageAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
             bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
@@ -212,7 +276,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         try {
-            log { "Attach fallback for : $currentAdUnit" }
+            log { "Attach fallback image for : $currentAdUnit" }
             Glide.with(ad).load(fallbackBanner.image).listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
                     sendFailure(e?.message ?: "")

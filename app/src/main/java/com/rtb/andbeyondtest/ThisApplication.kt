@@ -59,7 +59,7 @@ class ThisApplication : Application() {
 
         override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
             if (event == Lifecycle.Event.ON_START) {
-                currentActivity?.let { showAdIfAvailable(it) }
+              //  currentActivity?.let { showAdIfAvailable(it) }
             }
         }
 
