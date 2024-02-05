@@ -2,6 +2,7 @@ package com.rtb.andbeyondmedia.sdk
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
+import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 
 @Keep
 internal data class SDKConfig(
@@ -63,6 +64,8 @@ internal data class SDKConfig(
         val minViewRtb: Int? = null,
         @SerializedName("config")
         val refreshConfig: List<RefreshConfig>? = null,
+        @SerializedName("silent_interstitial_config")
+        val silentInterstitialConfig: SilentInterstitialConfig? = null,
         @SerializedName("block")
         private val block: List<List<String>?>? = null,
         @SerializedName("halt")
@@ -197,7 +200,9 @@ internal data class SDKConfig(
             @SerializedName("key_values")
             val extParams: List<KeyValuePair>? = null,
             @SerializedName("banner_api_parameters")
-            val bannerAPIParameters: List<Int>? = null
+            val bannerAPIParameters: List<Int>? = null,
+            @SerializedName("whitelisted_formats")
+            val whitelistedFormats: List<String>? = null
     ) {
         @Keep
         data class KeyValuePair(
@@ -224,7 +229,9 @@ internal data class SDKConfig(
             @SerializedName("location")
             val location: Int? = null,
             @SerializedName("slots")
-            val slots: List<Slot>? = null
+            val slots: List<Slot>? = null,
+            @SerializedName("whitelisted_formats")
+            val whitelistedFormats: List<String>? = null
     ) {
         @Keep
         data class Slot(
@@ -428,8 +435,12 @@ data class Fallback(
             var width: String? = null,
             @SerializedName("height")
             var height: String? = null,
+            @SerializedName("type")
+            val type: String? = null,
             @SerializedName("image")
             val image: String? = null,
+            @SerializedName("script")
+            val script: String? = null,
             @SerializedName("url")
             val url: String? = null,
             @SerializedName("tag")

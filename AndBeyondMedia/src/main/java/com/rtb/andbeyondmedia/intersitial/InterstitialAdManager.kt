@@ -64,7 +64,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
+                if (interstitialConfig.isNewUnitApplied()) {
                     adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack2)
@@ -154,7 +154,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (interstitialConfig.isNewUnit && interstitialConfig.newUnit?.status == 1) {
+                if (interstitialConfig.isNewUnitApplied()) {
                     adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
@@ -205,8 +205,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     }
                     try {
                         adFailedToLoad(tempStatus, callBack)
-                    } catch (e: Throwable) {
-                        e.printStackTrace()
+                    } catch (_: Throwable) {
                         callBack(null)
                     }
                 }
@@ -236,13 +235,14 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
         adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(interstitialConfig.unFilled)} && Retry config : ${Gson().toJson(interstitialConfig.retryConfig)}" }
         fun requestAd() {
+            interstitialConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
                 loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
             }
         }
         if (shouldBeActive) {
             if (interstitialConfig.unFilled?.status == 1) {
-                if (firstLook) {
+                if (firstLook && !interstitialConfig.isNewUnitApplied()) {
                     requestAd()
                 } else {
                     if ((interstitialConfig.retryConfig?.retries ?: 0) > 0) {
@@ -335,9 +335,22 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }.build()
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: (AdManagerAdRequest) -> Unit) {
-        val prebidAvailable = (!otherUnit && sdkConfig?.prebid?.firstLook == 1) || (otherUnit && sdkConfig?.prebid?.other == 1)
-        val apsAvailable = (!otherUnit && sdkConfig?.aps?.firstLook == 1) || (otherUnit && sdkConfig?.aps?.other == 1)
+        var prebidAvailable = (interstitialConfig.isNewUnitApplied() && sdkConfig?.prebid?.other == 1) ||
+                (otherUnit && !interstitialConfig.isNewUnitApplied() && sdkConfig?.prebid?.retry == 1) ||
+                (!otherUnit && sdkConfig?.prebid?.firstLook == 1)
+
+        var apsAvailable = (interstitialConfig.isNewUnitApplied() && sdkConfig?.aps?.other == 1) ||
+                (otherUnit && !interstitialConfig.isNewUnitApplied() && sdkConfig?.aps?.retry == 1) ||
+                (!otherUnit && sdkConfig?.aps?.firstLook == 1)
+
         val formatNeeded = interstitialConfig.format
+
+        if (sdkConfig?.prebid?.whitelistedFormats != null && sdkConfig?.prebid?.whitelistedFormats?.contains(AdTypes.INTERSTITIAL) == false) {
+            prebidAvailable = false
+        }
+        if (sdkConfig?.aps?.whitelistedFormats != null && sdkConfig?.aps?.whitelistedFormats?.contains(AdTypes.INTERSTITIAL) == false) {
+            apsAvailable = false
+        }
 
         fun prebid(apsRequestBuilder: AdManagerAdRequest.Builder? = null) {
             val adUnit = if (formatNeeded.isNullOrEmpty() || (formatNeeded.contains("html", true) && !formatNeeded.contains("video", true))) {

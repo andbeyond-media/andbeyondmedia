@@ -24,4 +24,23 @@ internal data class InterstitialConfig(
         var placement: SDKConfig.Placement? = null,
         @SerializedName("format")
         var format: String? = null
+) {
+        @Keep
+        fun isNewUnitApplied() = isNewUnit && newUnit?.status == 1
+}
+
+@Keep
+internal data class SilentInterstitialConfig(
+        @SerializedName("active")
+        val activePercentage: Int? = null,
+        @SerializedName("adunit")
+        val adunit: String? = null,
+        @SerializedName("custom")
+        val custom: Int? = null,
+        @SerializedName("timer")
+        val timer: Int? = null,
+        @SerializedName("close_delay")
+        val closeDelay: Int? = null,
+        @SerializedName("sizes")
+        val bannerSizes: List<SDKConfig.Size>? = null
 )
