@@ -179,7 +179,6 @@ internal object EventHelper {
         Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
         SentryAndroid.init(context) { options ->
             options.environment = context.packageName
-            options.isAttachAnrThreadDump = true
             options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
             options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
         }
