@@ -87,6 +87,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
     private var userLocation = Pair<Location?, Address?>(null, null)
+    var pendingImpression = false
 
     init {
         sdkConfig = storeService.config
@@ -359,6 +360,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }
     }
 
+    fun checkDetachDetect(): Boolean {
+        return shouldBeActive && (sdkConfig?.detectDetach ?: 1) == 1
+    }
+
     fun adReported(creativeId: String?, reportReasons: List<String>) {
         if (bannerConfig.geoEdge?.creativeIds?.replace(" ", "")?.split(",")?.contains(creativeId) == true) {
             refreshBlocked = true
@@ -604,11 +609,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
 
-        if (context.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity)) {
+        if (context.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity) && canRefresh()) {
             refreshAd()
         } else {
             startRefreshing(timers = timers)
         }
+    }
+
+    private fun canRefresh(): Boolean {
+        return if (sdkConfig?.forceImpression != 1) {
+            true
+        } else !pendingImpression
     }
 
     private fun createRequest(active: Int,

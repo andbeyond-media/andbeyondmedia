@@ -471,6 +471,17 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         bannerManager.saveVisibility(isVisible)
     }
 
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        try {
+            if (bannerManager.checkDetachDetect()) {
+                destroyAd()
+            }
+        } catch (_: Throwable) {
+
+        }
+    }
+
     private val adListener = object : AdListener() {
         override fun onAdClicked() {
             super.onAdClicked()
@@ -512,6 +523,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdImpression() {
             super.onAdImpression()
             bannerManager.adImpressed()
+            bannerManager.pendingImpression = false
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdImpression(this@BannerAdView)
             }
@@ -522,6 +534,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdLoaded() {
             super.onAdLoaded()
+            bannerManager.pendingImpression = true
             log { "Ad loaded with unit : $currentAdUnit" }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdLoaded(this@BannerAdView)

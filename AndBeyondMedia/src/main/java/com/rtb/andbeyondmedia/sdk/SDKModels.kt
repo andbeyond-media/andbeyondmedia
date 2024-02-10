@@ -62,6 +62,10 @@ internal data class SDKConfig(
         val minView: Int? = null,
         @SerializedName("min_view_rtb")
         val minViewRtb: Int? = null,
+        @SerializedName("force_impression")
+        val forceImpression: Int? = null,
+        @SerializedName("detect_detach")
+        val detectDetach: Int? = null,
         @SerializedName("config")
         val refreshConfig: List<RefreshConfig>? = null,
         @SerializedName("silent_interstitial_config")
