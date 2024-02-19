@@ -1087,6 +1087,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun attachScript(currentAdUnit: String, loadedSize: AdSize?): String? {
+        val number = (1..100).random()
+        if (number !in 1..(sdkConfig?.trackingConfig?.percentage ?: 0)) {
+            return null
+        }
         return if (loadedSize == null || currentAdUnit == bannerConfig.publisherAdUnit || sdkConfig?.trackingConfig?.getScript().isNullOrEmpty()) {
             null
         } else {
@@ -1101,7 +1105,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
             } catch (_: Throwable) {
                 null
             }
-
         }
     }
 }

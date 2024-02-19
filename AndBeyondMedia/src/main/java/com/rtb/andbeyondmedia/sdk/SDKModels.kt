@@ -119,7 +119,7 @@ internal data class SDKConfig(
             @SerializedName("script")
             private val script: String? = null
     ) {
-        fun getScript() = if (script == null) {
+        fun getScript() = if (script.isNullOrEmpty()) {
             null
         } else {
             String.format("<script type=\"text/javascript\" src=\"%s\"></script>", script)
