@@ -869,10 +869,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 
-    fun checkFallback(refreshLoad: Boolean): Boolean {
+    fun checkFallback(refreshLoad: Boolean, directOpenRTB: () -> Unit): Boolean {
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
-            return false
+            directOpenRTB()
+            return true
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
             val matchedBanners = arrayListOf<Fallback.Banner>()
@@ -937,7 +938,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return hold
     }
 
-    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit) {
+    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit) {
         if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
         if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 0)) return
         val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
@@ -953,7 +954,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
             openRTB.headers?.forEach { addHeader(it.key ?: "", it.value ?: "") }
         }.method("POST", requestBody).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: Call, e: IOException) {}
+            override fun onFailure(call: Call, e: IOException) {
+                CoroutineScope(Dispatchers.Main).launch { onFailure() }
+            }
 
             override fun onResponse(call: Call, response: Response) {
                 CoroutineScope(Dispatchers.Main).launch {
@@ -968,9 +971,14 @@ internal class BannerManager(private val context: Context, private val bannerLis
                                 val imageUrl = firstBid.optString("iurl")
                                 val scriptUrl = firstBid.optString("adm")
                                 onResponse(Pair(imageUrl, scriptUrl))
+                            } else {
+                                onFailure()
                             }
+                        } else {
+                            onFailure()
                         }
                     } catch (t: Throwable) {
+                        onFailure()
                         view.log { "Could not parse openRTB response because : ${t.localizedMessage}" }
                     }
                 }
@@ -1106,5 +1114,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 null
             }
         }
+    }
+
+    fun getBiggestSize(): AdSize {
+        var biggestPubSize: AdSize? = null
+        var maxArea = 0
+        pubAdSizes.filter { it != AdSize.FLUID }.forEach {
+            if (maxArea < (it.width * it.height)) {
+                biggestPubSize = it
+                maxArea = (it.width * it.height)
+            }
+        }
+        return biggestPubSize ?: AdSize.MEDIUM_RECTANGLE
     }
 }

@@ -162,7 +162,7 @@ internal class SilentInterstitial {
             }
 
             override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
-                tag.log { "Custom ad has load to failed with retry:$retrying" }
+                tag.log { "Custom ad has failed to load with retry:$retrying" }
             }
 
             override fun onAdImpression(bannerAdView: BannerAdView) {}
@@ -182,9 +182,10 @@ internal class SilentInterstitial {
     }
 
     private fun showCustomAd(ad: BannerAdView, activity: Activity) {
-        if (activity.isDestroyed || activity.isFinishing) return
+        if (activity.isDestroyed || activity.isFinishing || dialog?.isShowing == true) return
         tag.log { "Custom ad has loaded and it should show now" }
         try {
+            dialog?.cancel()
             dialog = AppCompatDialog(activity, android.R.style.Theme_Light)
             dialog?.requestWindowFeature(Window.FEATURE_NO_TITLE)
             dialog?.setContentView(R.layout.custom_inter_layout)

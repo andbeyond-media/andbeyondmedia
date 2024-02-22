@@ -188,7 +188,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private fun loadFallbackWebAd(scriptWebView: WebView, tagView: WebView, fallbackBanner: Fallback.Banner) {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
-            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0), {
                 val newWebView = WebView(context).apply {
                     settings.javaScriptEnabled = true
                 }
@@ -197,7 +197,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
-            }
+            }, {})
         }
 
         fun success() {
@@ -238,7 +238,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private fun loadFallbackImageAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
-            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0), {
                 val newWebView = WebView(context).apply {
                     settings.javaScriptEnabled = true
                 }
@@ -247,7 +247,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
-            }
+            }, {})
         }
 
         fun success() {
@@ -291,6 +291,26 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         } catch (_: Throwable) {
             sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun directOpenRtb() {
+        val size = bannerManager.getBiggestSize()
+        log { "Trying direct open rtb for : ${size.width}*${size.height}, first look is : $firstLook" }
+        bannerManager.initiateOpenRTB(size, {
+            val newWebView = WebView(context).apply {
+                settings.javaScriptEnabled = true
+            }
+            log { "Direct Open rtb loaded for : ${size.width}*${size.height}" }
+            newWebView.layoutParams = LayoutParams(context.dpToPx(size.width), context.dpToPx(size.height))
+            newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+            binding.root.removeAllViews()
+            binding.root.addView(newWebView)
+            adListener.onAdLoaded()
+            adListener.onAdImpression()
+        }, {
+            adListener.onAdFailedToLoad(LoadAdError(0, "No Fill", "", null, null))
+        })
     }
 
     fun setAdSize(adSize: BannerAdSize) = setAdSizes(adSize)
@@ -507,7 +527,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             if (!retryStatus) {
                 retryStatus = try {
-                    bannerManager.checkFallback(isRefreshLoaded)
+                    bannerManager.checkFallback(isRefreshLoaded) { directOpenRtb() }
                 } catch (_: Throwable) {
                     false
                 }
