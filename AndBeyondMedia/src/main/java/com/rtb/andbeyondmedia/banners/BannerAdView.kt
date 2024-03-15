@@ -32,12 +32,14 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerAdView
+import com.google.android.gms.ads.nativead.NativeAd
 import com.google.gson.Gson
 import com.pubmatic.sdk.common.POBError
 import com.pubmatic.sdk.openwrap.banner.POBBannerView
 import com.pubmatic.sdk.openwrap.banner.POBBannerView.POBBannerViewListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler.DFPConfigListener
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeEventHandler
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -450,6 +452,96 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         return true
     }
 
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: GAMNativeEventHandler.GAMConfigListener? = null, nativeAdListener: GAMNativeEventHandler.NativeAdListener? = null): Boolean {
+        if (!this::currentAdUnit.isInitialized) return false
+        if (this::adView.isInitialized) adView.destroy()
+        if (this::pobBanner.isInitialized) pobBanner.destroy()
+        fun loadGAM(adRequest: AdManagerAdRequest) {
+            if (this::adView.isInitialized) {
+                bannerManager.checkGeoEdge(false) { addGeoEdge(AdSdk.GAM, adView, false) }
+                log { "load GAM : ${adRequest.customTargeting}" }
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
+                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
+            }
+        }
+
+        val eventHandler = GAMNativeEventHandler(mContext, currentAdUnit, *currentAdSizes.toTypedArray())
+        configListener?.let { eventHandler.setConfigListener(configListener) }
+        eventHandler.configureNativeAd(object : GAMNativeEventHandler.NativeAdListener() {
+            override fun onAdReceived(nativeAd: NativeAd) {
+                nativeAdListener?.onAdReceived(nativeAd)
+                onNativeAdReceived()
+            }
+
+            override fun onAdOpened(p0: NativeAd) {
+                nativeAdListener?.onAdOpened(p0)
+                adListener.onAdOpened()
+            }
+
+            override fun onAdClosed(p0: NativeAd) {
+                nativeAdListener?.onAdClosed(p0)
+                adListener.onAdClosed()
+            }
+
+            override fun onAdImpression(p0: NativeAd) {
+                nativeAdListener?.onAdImpression(p0)
+                adListener.onAdImpression()
+            }
+
+            override fun onAdClicked(p0: NativeAd) {
+                nativeAdListener?.onAdClicked(p0)
+                adListener.onAdClicked()
+            }
+        })
+        val banner = POBBannerView(mContext, pubID, profile, owAdUnitId, eventHandler)
+        binding.root.removeAllViews()
+        pobBanner = banner
+        binding.root.addView(banner)
+        banner.setListener(object : POBBannerViewListener() {
+            override fun onAdFailed(p0: POBBannerView, p1: POBError) {
+                adListener.onAdFailedToLoad(LoadAdError(0, p1.errorMessage, "", null, null))
+            }
+
+            override fun onAdReceived(p0: POBBannerView) {
+                adListener.onAdLoaded()
+                adListener.onAdImpression()
+            }
+
+            override fun onAdOpened(p0: POBBannerView) {
+                adListener.onAdOpened()
+            }
+
+            override fun onAppLeaving(p0: POBBannerView) {
+                adListener.onAdClicked()
+            }
+
+            override fun onAdClosed(p0: POBBannerView) {
+                adListener.onAdClosed()
+            }
+        })
+        bannerManager.shouldSetConfig {
+            var adRequest: AdManagerAdRequest? = null
+            if (it) {
+                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                log { "attach hybrid pubmatic with publisher : $pubID, profile : $profile, open wrap Id : $owAdUnitId" }
+                adRequest = bannerManager.checkOverride()
+            }
+            adRequest?.let { request ->
+                loadGAM(request)
+            } ?: kotlin.run {
+                bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.PUBMATIC, banner, true) }
+                log { "load with hybrid pubmatic : $owAdUnitId" }
+                banner.adRequest.apply {
+                    owTestMode?.let { b -> enableTestMode(b) }
+                    owBidSummary?.let { b -> enableBidSummary(b) }
+                    owDebugState?.let { b -> enableDebugState(b) }
+                }
+                banner.loadAd()
+            }
+        }
+        return true
+    }
+
     private fun addGeoEdge(sdk: AdSdk, view: Any, firstLook: Boolean) {
         try {
             log { "addGeoEdge with first look : $firstLook" }
@@ -575,6 +667,15 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdOpened() {
             bannerAdListener?.onAdOpened(this@BannerAdView)
             super.onAdOpened()
+        }
+    }
+
+    private fun onNativeAdReceived() {
+        bannerManager.pendingImpression = false
+        log { "Ad native loaded with unit : $currentAdUnit" }
+        bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
+        if (firstLook) {
+            firstLook = false
         }
     }
 
