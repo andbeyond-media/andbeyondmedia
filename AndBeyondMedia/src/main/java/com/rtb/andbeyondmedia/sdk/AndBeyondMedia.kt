@@ -5,7 +5,16 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
-import androidx.work.*
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
 import com.amazon.device.ads.DTBAdNetworkInfo
@@ -130,7 +139,6 @@ object AndBeyondMedia {
                     if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
                         fetchCountry(context, config.countryStatus.url)
                     }
-                    checkForSilentInterstitial(context, config?.silentInterstitialConfig)
                     SDKManager.initialize(context)
                     if (config?.refetch != null) {
                         fetchConfig(context, storeService.config?.refetch)
@@ -150,7 +158,15 @@ object AndBeyondMedia {
             val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<CountryDetectionWorker>().setConstraints(constraints).setInputData(data.build()).build()
             val workName: String = CountryDetectionWorker::class.java.simpleName
             val workManager = getWorkManager(context)
+            val storeService = getStoreService(context)
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
+            workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
+                if (it?.state == WorkInfo.State.SUCCEEDED) {
+                    val config = storeService.config
+                    val countryConfig = storeService.detectedCountry
+                    checkForSilentInterstitial(context, config?.silentInterstitialConfig, countryConfig)
+                }
+            }
         } catch (e: Throwable) {
             e.stackTrace
         }
@@ -160,13 +176,28 @@ object AndBeyondMedia {
         silentInterstitial.registerActivity(activity)
     }
 
-    private fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?) {
+    private fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?, countryConfig: CountryModel?) {
         if (silentInterstitialConfig == null) {
             silentInterstitial.destroy()
             return
         }
+        val shouldStart: Boolean
+        val regionConfig = silentInterstitialConfig.regionConfig
+        shouldStart = if (regionConfig == null || (regionConfig.getCities().isEmpty() && regionConfig.getStates().isEmpty() && regionConfig.getCountries().isEmpty())) {
+            true
+        } else {
+            if ((regionConfig.mode ?: "allow").contains("allow", true)) {
+                regionConfig.getCities().any { it.equals(countryConfig?.city, true) }
+                        || regionConfig.getStates().any { it.equals(countryConfig?.state, true) }
+                        || regionConfig.getCountries().any { it.equals(countryConfig?.countryCode, true) }
+            } else {
+                regionConfig.getCities().none { it.equals(countryConfig?.city, true) }
+                        && regionConfig.getStates().none { it.equals(countryConfig?.state, true) }
+                        && regionConfig.getCountries().none { it.equals(countryConfig?.countryCode, true) }
+            }
+        }
         val number = (1..100).random()
-        if (number in 1..(silentInterstitialConfig.activePercentage ?: 0)) {
+        if (shouldStart && number in 1..(silentInterstitialConfig.activePercentage ?: 0)) {
             silentInterstitial.init(context)
         }
     }
@@ -268,12 +299,16 @@ internal class CountryDetectionWorker(private val context: Context, params: Work
                     storeService.detectedCountry = response.body()
                     Result.success()
                 } else {
-                    Result.failure()
+                    storeService.detectedCountry?.let {
+                        Result.success()
+                    } ?: Result.failure()
                 }
             }
         } catch (e: Throwable) {
             Logger.ERROR.log(msg = e.message ?: "")
-            Result.failure()
+            storeService.detectedCountry?.let {
+                Result.success()
+            } ?: Result.failure()
         }
     }
 }
@@ -412,6 +447,10 @@ internal class StoreService(private val prefs: SharedPreferences) {
         set(value) = prefs.edit().apply {
             value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
         }.apply()
+
+    var lastInterstitial: Long
+        get() = prefs.getLong("INTER_TIME", 0L)
+        set(value) = prefs.edit().putLong("INTER_TIME", value).apply()
 }
 
 internal class EventHandler(private val storeService: StoreService, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {

@@ -95,6 +95,7 @@ internal data class SDKConfig(
             private val cities: String? = null,
             private val states: String? = null,
             private val countries: String? = null,
+            val mode: String? = null,
             val units: ArrayList<String>? = null
     ) {
         fun getCities(): List<String> {
@@ -271,6 +272,8 @@ internal data class SDKConfig(
     data class OpenRTBConfig(
             @SerializedName("percentage")
             val percentage: Int? = null,
+            @SerializedName("inter_percentage")
+            val interPercentage: Int? = null,
             @SerializedName("timeout")
             val timeout: Int? = null,
             @SerializedName("tagid")

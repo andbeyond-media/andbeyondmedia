@@ -296,7 +296,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun setCountryConfig() {
         if (sdkConfig?.countryStatus?.active != 1) {
-            if ((sdkConfig?.openRTb?.percentage ?: 0) != 0 && (userLocation.first == null || (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null))) {
+            if (((sdkConfig?.openRTb?.percentage ?: 0) != 0 || (sdkConfig?.openRTb?.interPercentage ?: 0) != 0) && (userLocation.first == null || (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null))) {
                 context.getLocation()?.let {
                     userLocation = userLocation.copy(first = it)
                     if (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null) {
@@ -518,6 +518,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun startUnfilledRefreshCounter() {
+        if (isInter) return
         activeTimeCounter?.cancel()
         passiveTimeCounter?.cancel()
         val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
@@ -870,11 +871,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 
-    fun checkFallback(refreshLoad: Boolean, directOpenRTB: () -> Unit): Boolean {
+    fun checkFallback(refreshLoad: Boolean, errorCode: Int): Int {
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
-            directOpenRTB()
-            return true
+            return if (errorCode == -1) 0 else -1
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
             val matchedBanners = arrayListOf<Fallback.Banner>()
@@ -908,9 +908,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
 
             biggestBanner?.let { bannerListener.attachFallback(it) }
-            return biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)
+            return if (biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)) 1 else 0
         } else {
-            return false
+            return 0
         }
     }
 
@@ -957,10 +957,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return hold
     }
 
-    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit) {
-        if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
-        if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 0)) return
-        val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
+    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit): Boolean {
+        if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty()) return false
+        val percentage = (if (isInter) sdkConfig?.openRTb?.interPercentage else sdkConfig?.openRTb?.percentage) ?: 0
+        if ((1..100).random() !in 1..percentage) return false
+        val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return false
         view.log { "Will call open rtb for : ${adSize.width}*${adSize.height}" }
         val openRTB = sdkConfig?.openRTb!!
         val requestBody = prepareRequestBody(openRTB, adSize)
@@ -1004,6 +1005,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
 
         })
+        return true
     }
 
     private fun prepareRequestBody(openRTBConfig: SDKConfig.OpenRTBConfig, adSize: AdSize): RequestBody {

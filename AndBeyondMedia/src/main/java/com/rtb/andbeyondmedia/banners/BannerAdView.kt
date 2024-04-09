@@ -296,10 +296,10 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun directOpenRtb() {
+    private fun directOpenRtb(): Boolean {
         val size = bannerManager.getBiggestSize()
         log { "Trying direct open rtb for : ${size.width}*${size.height}, first look is : $firstLook" }
-        bannerManager.initiateOpenRTB(size, {
+        return bannerManager.initiateOpenRTB(size, {
             val newWebView = WebView(context).apply {
                 settings.javaScriptEnabled = true
             }
@@ -311,7 +311,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             adListener.onAdLoaded()
             adListener.onAdImpression()
         }, {
-            adListener.onAdFailedToLoad(LoadAdError(0, "No Fill", "", null, null))
+            adListener.onAdFailedToLoad(LoadAdError(-1, "No Fill", "", null, null))
         })
     }
 
@@ -619,7 +619,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             if (!retryStatus) {
                 retryStatus = try {
-                    bannerManager.checkFallback(isRefreshLoaded) { directOpenRtb() }
+                    val fallbackCode = bannerManager.checkFallback(isRefreshLoaded, p0.code)
+                    when (fallbackCode) {
+                        -1 -> directOpenRtb()
+                        1 -> true
+                        else -> false
+                    }
                 } catch (_: Throwable) {
                     false
                 }

@@ -41,6 +41,10 @@ internal data class SilentInterstitialConfig(
         val timer: Int? = null,
         @SerializedName("close_delay")
         val closeDelay: Int? = null,
+        @SerializedName("load_frequency")
+        val loadFrequency: Int? = null,
+        @SerializedName("regions")
+        val regionConfig: SDKConfig.Regions? = null,
         @SerializedName("sizes")
         val bannerSizes: List<SDKConfig.Size>? = null
 )
