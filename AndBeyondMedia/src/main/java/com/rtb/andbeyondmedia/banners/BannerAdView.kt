@@ -196,7 +196,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 }
                 log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
                 newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
             }, {})
@@ -207,7 +207,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             adListener.onAdLoaded()
             adListener.onAdImpression()
             fallbackBanner.getScriptSource()?.let {
-                tagView.loadData(it, "text/html; charset=utf-8", "UTF-8")
+                tagView.loadDataWithBaseURL("", it, "text/html; charset=utf-8", "UTF-8", "")
             }
         }
 
@@ -246,7 +246,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 }
                 log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
                 newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
             }, {})
@@ -305,7 +305,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             log { "Direct Open rtb loaded for : ${size.width}*${size.height}" }
             newWebView.layoutParams = LayoutParams(context.dpToPx(size.width), context.dpToPx(size.height))
-            newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+            newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
             binding.root.removeAllViews()
             binding.root.addView(newWebView)
             adListener.onAdLoaded()

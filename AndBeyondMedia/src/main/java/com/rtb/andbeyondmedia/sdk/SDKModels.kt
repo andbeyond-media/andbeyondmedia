@@ -74,6 +74,8 @@ internal data class SDKConfig(
         private val block: List<List<String>?>? = null,
         @SerializedName("halt")
         val heldUnits: ArrayList<String>? = null,
+        @SerializedName("regional_halts")
+        val regionalHalts: ArrayList<Regions>? = null,
         @SerializedName("hijack")
         val hijackConfig: LoadConfigs? = null,
         @SerializedName("unfilled")
@@ -92,7 +94,8 @@ internal data class SDKConfig(
     data class Regions(
             private val cities: String? = null,
             private val states: String? = null,
-            private val countries: String? = null
+            private val countries: String? = null,
+            val units: ArrayList<String>? = null
     ) {
         fun getCities(): List<String> {
             return cities?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()

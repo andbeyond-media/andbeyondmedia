@@ -446,9 +446,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
                     && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))
-                    && !ifUnitOnHold(loadedUnit)) {
+                    && !ifUnitOnHold(loadedUnit) && !ifUnitOnRegionalHold(loadedUnit)) {
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
             } else {
+                refreshBlocked = true
                 view.log { "Refresh blocked" }
                 passiveTimeCounter?.cancel()
                 activeTimeCounter?.cancel()
@@ -535,7 +536,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false, fixedUnit: String? = null) {
-        if (bannerConfig.adSizes.isEmpty()) return
+        if (!shouldBeActive || refreshBlocked || bannerConfig.adSizes.isEmpty()) return
         view.log { "Trying opportunity: active = $active, retrying = $unfilled, instant = $instantRefresh" }
         val currentTimeStamp = Date().time
         fun refreshAd() {
@@ -931,9 +932,27 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun ifUnitOnHold(adUnit: String): Boolean {
-        val hold = sdkConfig?.heldUnits?.any { adUnit.contains(it, false) } == true || sdkConfig?.heldUnits?.any { it.contains("all", true) } == true
+        val hold = sdkConfig?.heldUnits?.any { adUnit.contains(it, true) } == true || sdkConfig?.heldUnits?.any { it.contains("all", true) } == true
         if (hold) {
             view.log { "Blocking refresh on : $adUnit" }
+        }
+        return hold
+    }
+
+    private fun ifUnitOnRegionalHold(adUnit: String): Boolean {
+        var hold = false
+        if (sdkConfig?.countryStatus?.active == 1) {
+            sdkConfig?.regionalHalts?.forEach { region ->
+                if ((region.getCities().any { it.equals(countrySetup.third?.city, true) }
+                                || region.getStates().any { it.equals(countrySetup.third?.state, true) }
+                                || region.getCountries().any { it.equals(countrySetup.third?.countryCode, true) })
+                        && (region.units?.any { adUnit.contains(it, true) } == true)) {
+                    hold = true
+                }
+            }
+        }
+        if (hold) {
+            view.log { "Regional blocking refresh on : $adUnit" }
         }
         return hold
     }
