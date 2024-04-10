@@ -239,7 +239,13 @@ internal data class SDKConfig(
             @SerializedName("slots")
             val slots: List<Slot>? = null,
             @SerializedName("whitelisted_formats")
-            val whitelistedFormats: List<String>? = null
+            val whitelistedFormats: List<String>? = null,
+            @SerializedName("omid_partner_name")
+            val omidPartnerName: String? = null,
+            @SerializedName("omid_partner_version")
+            val omidPartnerVersion: String? = null,
+            @SerializedName("mraid_supported_versions")
+            val mRaidSupportedVersions: List<String>? = null
     ) {
         @Keep
         data class Slot(

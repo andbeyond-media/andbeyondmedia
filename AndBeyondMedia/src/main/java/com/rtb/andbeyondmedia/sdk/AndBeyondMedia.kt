@@ -18,6 +18,7 @@ import androidx.work.WorkerParameters
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
 import com.amazon.device.ads.DTBAdNetworkInfo
+import com.amazon.device.ads.MRAIDPolicy
 import com.appharbr.sdk.configuration.AHSdkConfiguration
 import com.appharbr.sdk.engine.AppHarbr
 import com.appharbr.sdk.engine.InitializationFailureReason
@@ -386,6 +387,16 @@ internal object SDKManager {
             AdRegistration.getInstance(aps?.appKey ?: "", context)
             AdRegistration.setAdNetworkInfo(DTBAdNetworkInfo(DTBAdNetwork.GOOGLE_AD_MANAGER))
             AdRegistration.useGeoLocation(aps?.location == null || aps.location == 1)
+            AdRegistration.setMRAIDPolicy(MRAIDPolicy.CUSTOM)
+            aps?.mRaidSupportedVersions?.let {
+                AdRegistration.setMRAIDSupportedVersions(it.toTypedArray())
+            }
+            aps?.omidPartnerName?.let {
+                AdRegistration.addCustomAttribute("omidPartnerName", it)
+            }
+            aps?.omidPartnerVersion?.let {
+                AdRegistration.addCustomAttribute("omidPartnerVersion", it)
+            }
         }
         if (aps?.delay == null || aps.delay.toIntOrNull() == 0) {
             init()
