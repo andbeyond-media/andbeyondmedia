@@ -33,6 +33,7 @@ import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitial
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
+import com.rtb.andbeyondmedia.sdk.EventHelper.attachSentry
 import com.rtb.andbeyondmedia.sdk.EventHelper.shouldHandle
 import io.sentry.Sentry
 import io.sentry.SentryEvent
@@ -140,6 +141,7 @@ object AndBeyondMedia {
                     if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
                         fetchCountry(context, config.countryStatus.url)
                     }
+                    attachSentry(context)
                     SDKManager.initialize(context)
                     if (config?.refetch != null) {
                         fetchConfig(context, storeService.config?.refetch)
@@ -209,10 +211,17 @@ internal object EventHelper {
     fun attachEventHandler(context: Context) {
         val storeService = AndBeyondMedia.getStoreService(context)
         Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
-        SentryAndroid.init(context) { options ->
-            options.environment = context.packageName
-            options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
-            options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
+    }
+
+    fun attachSentry(context: Context) {
+        val storeService = AndBeyondMedia.getStoreService(context)
+        val sentryInitPercentage = storeService.config?.events?.sentry ?: 100
+        if (shouldHandle(sentryInitPercentage) && !Sentry.isEnabled()) {
+            SentryAndroid.init(context) { options ->
+                options.environment = context.packageName
+                options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
+                options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
+            }
         }
     }
 

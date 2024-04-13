@@ -138,6 +138,8 @@ internal data class SDKConfig(
             val other: Int? = null,
             @SerializedName("oom")
             val oom: Int? = null,
+            @SerializedName("sentry")
+            val sentry: Int? = null
     )
 
     @Keep
