@@ -296,7 +296,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun setCountryConfig() {
         if (sdkConfig?.countryStatus?.active != 1) {
-            if ((sdkConfig?.openRTb?.percentage ?: 0) != 0 && (userLocation.first == null || (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null))) {
+            if (((sdkConfig?.openRTb?.percentage ?: 0) != 0 || (sdkConfig?.openRTb?.interPercentage ?: 0) != 0) && (userLocation.first == null || (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null))) {
                 context.getLocation()?.let {
                     userLocation = userLocation.copy(first = it)
                     if (sdkConfig?.openRTb?.geoCode == 1 && userLocation.second == null) {
@@ -446,9 +446,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
                     && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))
-                    && !ifUnitOnHold(loadedUnit)) {
+                    && !ifUnitOnHold(loadedUnit) && !ifUnitOnRegionalHold(loadedUnit)) {
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
             } else {
+                refreshBlocked = true
                 view.log { "Refresh blocked" }
                 passiveTimeCounter?.cancel()
                 activeTimeCounter?.cancel()
@@ -517,6 +518,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun startUnfilledRefreshCounter() {
+        if (isInter) return
         activeTimeCounter?.cancel()
         passiveTimeCounter?.cancel()
         val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
@@ -535,7 +537,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun refresh(active: Int = 1, unfilled: Boolean = false, instantRefresh: Boolean = false, fixedUnit: String? = null) {
-        if (bannerConfig.adSizes.isEmpty()) return
+        if (!shouldBeActive || refreshBlocked || bannerConfig.adSizes.isEmpty()) return
         view.log { "Trying opportunity: active = $active, retrying = $unfilled, instant = $instantRefresh" }
         val currentTimeStamp = Date().time
         fun refreshAd() {
@@ -869,10 +871,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 
-    fun checkFallback(refreshLoad: Boolean): Boolean {
+    fun checkFallback(refreshLoad: Boolean, errorCode: Int): Int {
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
-            return false
+            return if (errorCode == -1) 0 else -1
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
             val matchedBanners = arrayListOf<Fallback.Banner>()
@@ -906,9 +908,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
 
             biggestBanner?.let { bannerListener.attachFallback(it) }
-            return biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)
+            return if (biggestBanner != null && ((biggestBanner?.height?.toIntOrNull() ?: 0) != 0 && (biggestBanner?.width?.toIntOrNull() ?: 0) != 0)) 1 else 0
         } else {
-            return false
+            return 0
         }
     }
 
@@ -930,17 +932,36 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun ifUnitOnHold(adUnit: String): Boolean {
-        val hold = sdkConfig?.heldUnits?.any { adUnit.contains(it, false) } == true || sdkConfig?.heldUnits?.any { it.contains("all", true) } == true
+        val hold = sdkConfig?.heldUnits?.any { adUnit.contains(it, true) } == true || sdkConfig?.heldUnits?.any { it.contains("all", true) } == true
         if (hold) {
             view.log { "Blocking refresh on : $adUnit" }
         }
         return hold
     }
 
-    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit) {
-        if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty() || (sdkConfig?.openRTb?.percentage ?: 0) == 0) return
-        if ((1..100).random() !in 1..(sdkConfig?.openRTb?.percentage ?: 0)) return
-        val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return
+    private fun ifUnitOnRegionalHold(adUnit: String): Boolean {
+        var hold = false
+        if (sdkConfig?.countryStatus?.active == 1) {
+            sdkConfig?.regionalHalts?.forEach { region ->
+                if ((region.getCities().any { it.equals(countrySetup.third?.city, true) }
+                                || region.getStates().any { it.equals(countrySetup.third?.state, true) }
+                                || region.getCountries().any { it.equals(countrySetup.third?.countryCode, true) })
+                        && (region.units?.any { adUnit.contains(it, true) } == true)) {
+                    hold = true
+                }
+            }
+        }
+        if (hold) {
+            view.log { "Regional blocking refresh on : $adUnit" }
+        }
+        return hold
+    }
+
+    fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit): Boolean {
+        if (sdkConfig?.openRTb == null || sdkConfig?.openRTb?.url.isNullOrEmpty() || sdkConfig?.openRTb?.request.isNullOrEmpty()) return false
+        val percentage = (if (isInter) sdkConfig?.openRTb?.interPercentage else sdkConfig?.openRTb?.percentage) ?: 0
+        if ((1..100).random() !in 1..percentage) return false
+        val urlBuilder = sdkConfig?.openRTb?.url?.toHttpUrlOrNull() ?: return false
         view.log { "Will call open rtb for : ${adSize.width}*${adSize.height}" }
         val openRTB = sdkConfig?.openRTb!!
         val requestBody = prepareRequestBody(openRTB, adSize)
@@ -953,7 +974,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
             openRTB.headers?.forEach { addHeader(it.key ?: "", it.value ?: "") }
         }.method("POST", requestBody).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: Call, e: IOException) {}
+            override fun onFailure(call: Call, e: IOException) {
+                CoroutineScope(Dispatchers.Main).launch { onFailure() }
+            }
 
             override fun onResponse(call: Call, response: Response) {
                 CoroutineScope(Dispatchers.Main).launch {
@@ -968,15 +991,21 @@ internal class BannerManager(private val context: Context, private val bannerLis
                                 val imageUrl = firstBid.optString("iurl")
                                 val scriptUrl = firstBid.optString("adm")
                                 onResponse(Pair(imageUrl, scriptUrl))
+                            } else {
+                                onFailure()
                             }
+                        } else {
+                            onFailure()
                         }
                     } catch (t: Throwable) {
+                        onFailure()
                         view.log { "Could not parse openRTB response because : ${t.localizedMessage}" }
                     }
                 }
             }
 
         })
+        return true
     }
 
     private fun prepareRequestBody(openRTBConfig: SDKConfig.OpenRTBConfig, adSize: AdSize): RequestBody {
@@ -1106,5 +1135,17 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 null
             }
         }
+    }
+
+    fun getBiggestSize(): AdSize {
+        var biggestPubSize: AdSize? = null
+        var maxArea = 0
+        pubAdSizes.filter { it != AdSize.FLUID }.forEach {
+            if (maxArea < (it.width * it.height)) {
+                biggestPubSize = it
+                maxArea = (it.width * it.height)
+            }
+        }
+        return biggestPubSize ?: AdSize.MEDIUM_RECTANGLE
     }
 }

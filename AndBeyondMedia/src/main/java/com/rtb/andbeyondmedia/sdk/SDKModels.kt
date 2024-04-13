@@ -74,6 +74,8 @@ internal data class SDKConfig(
         private val block: List<List<String>?>? = null,
         @SerializedName("halt")
         val heldUnits: ArrayList<String>? = null,
+        @SerializedName("regional_halts")
+        val regionalHalts: ArrayList<Regions>? = null,
         @SerializedName("hijack")
         val hijackConfig: LoadConfigs? = null,
         @SerializedName("unfilled")
@@ -92,7 +94,9 @@ internal data class SDKConfig(
     data class Regions(
             private val cities: String? = null,
             private val states: String? = null,
-            private val countries: String? = null
+            private val countries: String? = null,
+            val mode: String? = null,
+            val units: ArrayList<String>? = null
     ) {
         fun getCities(): List<String> {
             return cities?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
@@ -134,6 +138,8 @@ internal data class SDKConfig(
             val other: Int? = null,
             @SerializedName("oom")
             val oom: Int? = null,
+            @SerializedName("sentry")
+            val sentry: Int? = null
     )
 
     @Keep
@@ -235,7 +241,13 @@ internal data class SDKConfig(
             @SerializedName("slots")
             val slots: List<Slot>? = null,
             @SerializedName("whitelisted_formats")
-            val whitelistedFormats: List<String>? = null
+            val whitelistedFormats: List<String>? = null,
+            @SerializedName("omid_partner_name")
+            val omidPartnerName: String? = null,
+            @SerializedName("omid_partner_version")
+            val omidPartnerVersion: String? = null,
+            @SerializedName("mraid_supported_versions")
+            val mRaidSupportedVersions: List<String>? = null
     ) {
         @Keep
         data class Slot(
@@ -268,6 +280,8 @@ internal data class SDKConfig(
     data class OpenRTBConfig(
             @SerializedName("percentage")
             val percentage: Int? = null,
+            @SerializedName("inter_percentage")
+            val interPercentage: Int? = null,
             @SerializedName("timeout")
             val timeout: Int? = null,
             @SerializedName("tagid")

@@ -21,13 +21,14 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
-import com.rtb.andbeyondmedia.sdk.SDKConfig
+import com.rtb.andbeyondmedia.sdk.StoreService
 import com.rtb.andbeyondmedia.sdk.log
+import java.util.Date
 
 internal class SilentInterstitial {
 
     private var activities: ArrayList<Activity> = arrayListOf()
-    private var sdkConfig: SDKConfig? = null
+    private var storeService: StoreService? = null
     private var interstitialConfig: SilentInterstitialConfig = SilentInterstitialConfig()
     private var activeTimeCounter: CountDownTimer? = null
     private var closeDelayTimer: CountDownTimer? = null
@@ -48,8 +49,9 @@ internal class SilentInterstitial {
     fun init(context: Context) {
         if (started) return
         tag.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
-        sdkConfig = AndBeyondMedia.getStoreService(context).config
-        val shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        storeService = AndBeyondMedia.getStoreService(context)
+        val sdkConfig = storeService?.config
+        val shouldBeActive = !(sdkConfig == null || sdkConfig.switch != 1)
         if (!shouldBeActive) return
         interstitialConfig = sdkConfig?.silentInterstitialConfig ?: SilentInterstitialConfig()
         ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifeCycleHandler())
@@ -109,10 +111,16 @@ internal class SilentInterstitial {
     }
 
     private fun loadAd() {
-        if (interstitialConfig.custom == 1) {
-            loadCustomInterstitial()
+        val lastInterShown = storeService?.lastInterstitial ?: 0L
+        if (Date().time - lastInterShown >= (interstitialConfig.loadFrequency ?: 0) * 1000) {
+            if (interstitialConfig.custom == 1) {
+                loadCustomInterstitial()
+            } else {
+                loadInterstitial()
+            }
         } else {
-            loadInterstitial()
+            tag.log { "Frequency condition did not met." }
+            resumeCounter()
         }
     }
 
@@ -122,6 +130,7 @@ internal class SilentInterstitial {
         interstitialAd.load(AdRequest().Builder().build()) { loaded ->
             if (loaded) {
                 tag.log { "Interstitial ad has loaded and it should show now" }
+                storeService?.lastInterstitial = Date().time
                 interstitialAd.show()
                 resumeCounter()
             } else {
@@ -162,7 +171,10 @@ internal class SilentInterstitial {
             }
 
             override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
-                tag.log { "Custom ad has load to failed with retry:$retrying" }
+                tag.log { "Custom ad has failed to load with retry:$retrying" }
+                if (!retrying) {
+                    resumeCounter()
+                }
             }
 
             override fun onAdImpression(bannerAdView: BannerAdView) {}
@@ -182,9 +194,10 @@ internal class SilentInterstitial {
     }
 
     private fun showCustomAd(ad: BannerAdView, activity: Activity) {
-        if (activity.isDestroyed || activity.isFinishing) return
+        if (activity.isDestroyed || activity.isFinishing || dialog?.isShowing == true) return
         tag.log { "Custom ad has loaded and it should show now" }
         try {
+            dialog?.cancel()
             dialog = AppCompatDialog(activity, android.R.style.Theme_Light)
             dialog?.requestWindowFeature(Window.FEATURE_NO_TITLE)
             dialog?.setContentView(R.layout.custom_inter_layout)
@@ -206,6 +219,7 @@ internal class SilentInterstitial {
             }
             closeDelayTimer?.start()
             dialog?.show()
+            storeService?.lastInterstitial = Date().time
         } catch (e: Throwable) {
             tag.log { "Custom ad could not show because : ${e.localizedMessage}" }
         }

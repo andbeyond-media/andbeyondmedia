@@ -32,12 +32,14 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerAdView
+import com.google.android.gms.ads.nativead.NativeAd
 import com.google.gson.Gson
 import com.pubmatic.sdk.common.POBError
 import com.pubmatic.sdk.openwrap.banner.POBBannerView
 import com.pubmatic.sdk.openwrap.banner.POBBannerView.POBBannerViewListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler.DFPConfigListener
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeEventHandler
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -188,16 +190,16 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private fun loadFallbackWebAd(scriptWebView: WebView, tagView: WebView, fallbackBanner: Fallback.Banner) {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
-            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0), {
                 val newWebView = WebView(context).apply {
                     settings.javaScriptEnabled = true
                 }
                 log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
                 newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
-            }
+            }, {})
         }
 
         fun success() {
@@ -205,7 +207,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             adListener.onAdLoaded()
             adListener.onAdImpression()
             fallbackBanner.getScriptSource()?.let {
-                tagView.loadData(it, "text/html; charset=utf-8", "UTF-8")
+                tagView.loadDataWithBaseURL("", it, "text/html; charset=utf-8", "UTF-8", "")
             }
         }
 
@@ -238,16 +240,16 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private fun loadFallbackImageAd(ad: ImageView, webView: WebView, fallbackBanner: Fallback.Banner) = CoroutineScope(Dispatchers.Main).launch {
         fun callOpenRTb() {
             log { "Trying open rtb for : ${fallbackBanner.width}*${fallbackBanner.height}, first look is : $firstLook" }
-            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0)) {
+            bannerManager.initiateOpenRTB(AdSize(fallbackBanner.width?.toIntOrNull() ?: 0, fallbackBanner.height?.toIntOrNull() ?: 0), {
                 val newWebView = WebView(context).apply {
                     settings.javaScriptEnabled = true
                 }
                 log { "Open rtb loaded for : ${fallbackBanner.width}*${fallbackBanner.height}" }
                 newWebView.layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
-                newWebView.loadData(it.second, "text/html; charset=utf-8", "UTF-8")
+                newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
                 binding.root.removeAllViews()
                 binding.root.addView(newWebView)
-            }
+            }, {})
         }
 
         fun success() {
@@ -291,6 +293,26 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         } catch (_: Throwable) {
             sendFailure(AndBeyondError.ERROR_AD_NOT_AVAILABLE.toString())
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun directOpenRtb(): Boolean {
+        val size = bannerManager.getBiggestSize()
+        log { "Trying direct open rtb for : ${size.width}*${size.height}, first look is : $firstLook" }
+        return bannerManager.initiateOpenRTB(size, {
+            val newWebView = WebView(context).apply {
+                settings.javaScriptEnabled = true
+            }
+            log { "Direct Open rtb loaded for : ${size.width}*${size.height}" }
+            newWebView.layoutParams = LayoutParams(context.dpToPx(size.width), context.dpToPx(size.height))
+            newWebView.loadDataWithBaseURL("", it.second, "text/html; charset=utf-8", "UTF-8", "")
+            binding.root.removeAllViews()
+            binding.root.addView(newWebView)
+            adListener.onAdLoaded()
+            adListener.onAdImpression()
+        }, {
+            adListener.onAdFailedToLoad(LoadAdError(-1, "No Fill", "", null, null))
+        })
     }
 
     fun setAdSize(adSize: BannerAdSize) = setAdSizes(adSize)
@@ -430,6 +452,96 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         return true
     }
 
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: GAMNativeEventHandler.GAMConfigListener? = null, nativeAdListener: GAMNativeEventHandler.NativeAdListener? = null): Boolean {
+        if (!this::currentAdUnit.isInitialized) return false
+        if (this::adView.isInitialized) adView.destroy()
+        if (this::pobBanner.isInitialized) pobBanner.destroy()
+        fun loadGAM(adRequest: AdManagerAdRequest) {
+            if (this::adView.isInitialized) {
+                bannerManager.checkGeoEdge(false) { addGeoEdge(AdSdk.GAM, adView, false) }
+                log { "load GAM : ${adRequest.customTargeting}" }
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
+                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
+            }
+        }
+
+        val eventHandler = GAMNativeEventHandler(mContext, currentAdUnit, *currentAdSizes.toTypedArray())
+        configListener?.let { eventHandler.setConfigListener(configListener) }
+        eventHandler.configureNativeAd(object : GAMNativeEventHandler.NativeAdListener() {
+            override fun onAdReceived(nativeAd: NativeAd) {
+                nativeAdListener?.onAdReceived(nativeAd)
+                onNativeAdReceived()
+            }
+
+            override fun onAdOpened(p0: NativeAd) {
+                nativeAdListener?.onAdOpened(p0)
+                adListener.onAdOpened()
+            }
+
+            override fun onAdClosed(p0: NativeAd) {
+                nativeAdListener?.onAdClosed(p0)
+                adListener.onAdClosed()
+            }
+
+            override fun onAdImpression(p0: NativeAd) {
+                nativeAdListener?.onAdImpression(p0)
+                adListener.onAdImpression()
+            }
+
+            override fun onAdClicked(p0: NativeAd) {
+                nativeAdListener?.onAdClicked(p0)
+                adListener.onAdClicked()
+            }
+        })
+        val banner = POBBannerView(mContext, pubID, profile, owAdUnitId, eventHandler)
+        binding.root.removeAllViews()
+        pobBanner = banner
+        binding.root.addView(banner)
+        banner.setListener(object : POBBannerViewListener() {
+            override fun onAdFailed(p0: POBBannerView, p1: POBError) {
+                adListener.onAdFailedToLoad(LoadAdError(0, p1.errorMessage, "", null, null))
+            }
+
+            override fun onAdReceived(p0: POBBannerView) {
+                adListener.onAdLoaded()
+                adListener.onAdImpression()
+            }
+
+            override fun onAdOpened(p0: POBBannerView) {
+                adListener.onAdOpened()
+            }
+
+            override fun onAppLeaving(p0: POBBannerView) {
+                adListener.onAdClicked()
+            }
+
+            override fun onAdClosed(p0: POBBannerView) {
+                adListener.onAdClosed()
+            }
+        })
+        bannerManager.shouldSetConfig {
+            var adRequest: AdManagerAdRequest? = null
+            if (it) {
+                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                log { "attach hybrid pubmatic with publisher : $pubID, profile : $profile, open wrap Id : $owAdUnitId" }
+                adRequest = bannerManager.checkOverride()
+            }
+            adRequest?.let { request ->
+                loadGAM(request)
+            } ?: kotlin.run {
+                bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.PUBMATIC, banner, true) }
+                log { "load with hybrid pubmatic : $owAdUnitId" }
+                banner.adRequest.apply {
+                    owTestMode?.let { b -> enableTestMode(b) }
+                    owBidSummary?.let { b -> enableBidSummary(b) }
+                    owDebugState?.let { b -> enableDebugState(b) }
+                }
+                banner.loadAd()
+            }
+        }
+        return true
+    }
+
     private fun addGeoEdge(sdk: AdSdk, view: Any, firstLook: Boolean) {
         try {
             log { "addGeoEdge with first look : $firstLook" }
@@ -507,7 +619,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             if (!retryStatus) {
                 retryStatus = try {
-                    bannerManager.checkFallback(isRefreshLoaded)
+                    val fallbackCode = bannerManager.checkFallback(isRefreshLoaded, p0.code)
+                    when (fallbackCode) {
+                        -1 -> directOpenRtb()
+                        1 -> true
+                        else -> false
+                    }
                 } catch (_: Throwable) {
                     false
                 }
@@ -555,6 +672,15 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdOpened() {
             bannerAdListener?.onAdOpened(this@BannerAdView)
             super.onAdOpened()
+        }
+    }
+
+    private fun onNativeAdReceived() {
+        bannerManager.pendingImpression = false
+        log { "Ad native loaded with unit : $currentAdUnit" }
+        bannerManager.adLoaded(firstLook, currentAdUnit, adView.responseInfo?.loadedAdapterResponseInfo)
+        if (firstLook) {
+            firstLook = false
         }
     }
 
