@@ -12,6 +12,12 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.gson.Gson
+import com.pubmatic.sdk.common.POBError
+import com.pubmatic.sdk.nativead.POBNativeAd
+import com.pubmatic.sdk.nativead.POBNativeAdLoader
+import com.pubmatic.sdk.nativead.POBNativeAdLoaderListener
+import com.pubmatic.sdk.nativead.datatype.POBNativeTemplateType
+import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeEventHandler
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -43,6 +49,9 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     private var adOptions = NativeAdOptions.Builder().build()
     private var loadCount: Int = 0
     private lateinit var adLoader: AdLoader
+    var owBidSummary: Boolean? = null
+    var owDebugState: Boolean? = null
+    var owTestMode: Boolean? = null
 
     init {
         sdkConfig = storeService.config
@@ -63,6 +72,87 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
 
     fun isLoading(): Boolean {
         return this::adLoader.isInitialized && adLoader.isLoading
+    }
+
+    fun enableTestMode(enabled: Boolean) {
+        owTestMode = enabled
+    }
+
+    fun enableDebugState(enabled: Boolean) {
+        owDebugState = enabled
+    }
+
+    fun enableBidSummary(enabled: Boolean) {
+        owBidSummary = enabled
+    }
+
+    fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, templateType: POBNativeTemplateType,
+                   eventHandler: GAMNativeEventHandler? = null, fallback: (fallbackAd: NativeAd?) -> Unit,
+                   callBack: (nativeAdLoader: POBNativeAdLoader?, pobNativeAd: POBNativeAd?) -> Unit) {
+        shouldSetConfig {
+            if (it) {
+                setConfig()
+                if (nativeConfig.isNewUnitApplied()) {
+                    adUnit.log { "new unit override on ow adunit : $adUnit" }
+                    createRequest().getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, fallback)
+                    }
+                } else if (checkHijack(nativeConfig.hijack)) {
+                    adUnit.log { "hijack override on ow adunit : $adUnit" }
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, fallback)
+                    }
+                } else {
+                    loadOW(pubID, profile, owAdUnitId, templateType, eventHandler, fallback, callBack)
+                }
+            } else {
+                loadOW(pubID, profile, owAdUnitId, templateType, eventHandler, fallback, callBack)
+            }
+        }
+    }
+
+    private fun loadOW(pubID: String, profile: Int, owAdUnitId: String, templateType: POBNativeTemplateType,
+                       eventHandler: GAMNativeEventHandler? = null, fallback: (fallbackAd: NativeAd?) -> Unit,
+                       callBack: (nativeAdLoader: POBNativeAdLoader?, pobNativeAd: POBNativeAd?) -> Unit) {
+        adUnit.log { "loading $adUnit by Pubmatic with pub id : $pubID, profile : $profile, owUnit : $owAdUnitId" }
+        val nativeAdLoader = eventHandler?.let {
+            POBNativeAdLoader(context, pubID, profile, owAdUnitId, templateType, it)
+        } ?: POBNativeAdLoader(context, pubID, profile, owAdUnitId, templateType)
+        nativeAdLoader.setAdLoaderListener(object : POBNativeAdLoaderListener {
+            override fun onAdReceived(p0: POBNativeAdLoader, p1: POBNativeAd) {
+                adUnit.log { "loaded $adUnit by pubmatic" }
+                nativeConfig.retryConfig = sdkConfig?.retryConfig
+                fallback(null)
+                callBack(p0, p1)
+                adListener?.onAdLoaded()
+                firstLook = false
+            }
+
+            override fun onFailedToLoad(p0: POBNativeAdLoader, p1: POBError) {
+                adUnit.log { "loading $adUnit failed by pubmatic with error : ${p1.errorMessage}" }
+                val tempStatus = firstLook
+                if (firstLook) {
+                    firstLook = false
+                }
+                val adError = LoadAdError(p1.errorCode, p1.errorMessage, "", null, null)
+                try {
+                    callBack(null, null)
+                    adFailedToLoad(tempStatus, fallback, adError)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                    fallback(null)
+                    callBack(null, null)
+                    adListener?.onAdFailedToLoad(adError)
+                }
+            }
+        })
+
+        nativeAdLoader.adRequest?.apply {
+            owTestMode?.let { b -> enableTestMode(b) }
+            owBidSummary?.let { b -> enableBidSummary(b) }
+            owDebugState?.let { b -> enableDebugState(b) }
+        }
+        nativeAdLoader.loadAd()
     }
 
     fun load(adRequest: AdRequest, callBack: (nativeAd: NativeAd?) -> Unit) {
@@ -106,7 +196,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
 
     private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (nativeAd: NativeAd?) -> Unit) {
         otherUnit = adUnit != this.adUnit
-        this.adUnit.log { "loading $adUnit by Native" }
+        this.adUnit.log { "loading $adUnit by Native GAM" }
         fetchDemand(adRequest) {
             adLoader = AdLoader.Builder(context, adUnit)
                     .forNativeAd { nativeAd: NativeAd ->
@@ -140,7 +230,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                         }
 
                         override fun onAdFailedToLoad(adError: LoadAdError) {
-                            Logger.ERROR.log(msg = adError.message)
+                            this@NativeAdManager.adUnit.log { "loading $adUnit failed by GAM with error : ${adError.message}" }
                             val tempStatus = firstLook
                             if (firstLook) {
                                 firstLook = false
@@ -165,7 +255,8 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     }
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (nativeAd: NativeAd?) -> Unit, adError: LoadAdError) {
-        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)}" }
+        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)} " +
+                "&& isFirstLook : $firstLook" }
         fun requestAd() {
             nativeConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
