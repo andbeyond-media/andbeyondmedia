@@ -41,7 +41,6 @@ import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.DFPBannerEventHandler.DFPConfigListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMConfigListener
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeBannerEventHandler
-import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeEventHandler
 import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
@@ -79,6 +78,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private var owBidSummary: Boolean? = null
     private var owDebugState: Boolean? = null
     private var owTestMode: Boolean? = null
+    private var pendingAttach: Boolean = false
 
     constructor(context: Context) : super(context) {
         init(context, null)
@@ -123,7 +123,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     else String.format(Locale.ENGLISH, "%s,%s", adSizes, adSize)
                 }
                 if (adUnitId.isNotEmpty() && adSizes.isNotEmpty()) {
-                    attachAdView(adUnitId, bannerManager.convertStringSizesToAdSizes(adSizes))
+                    attachAdView(adUnitId, bannerManager.convertStringSizesToAdSizes(adSizes), true)
                 }
             }
         }
@@ -133,7 +133,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         bannerManager.isInter = true
     }
 
-    override fun attachAdView(adUnitId: String, adSizes: List<AdSize>) {
+    override fun attachAdView(adUnitId: String, adSizes: List<AdSize>, attach: Boolean) {
         if (this::adView.isInitialized) adView.destroy()
         if (this::pobBanner.isInitialized) pobBanner.destroy()
         adView = AdManagerAdView(mContext)
@@ -154,12 +154,26 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         adView.adUnitId = adUnitId
         adView.adListener = adListener
         videoOptions?.let { adView.setVideoOptions(it) }
+        if (bannerManager.isSeemLessRefreshActive()) {
+            if (attach) {
+                attachView()
+            } else {
+                pendingAttach = true
+                log { "Pending attachAdView : $adUnitId" }
+            }
+        } else {
+            attachView()
+        }
+    }
+
+    private fun attachView() {
         try {
             binding.root.removeAllViews()
             binding.root.addView(adView)
         } catch (_: Throwable) {
         }
-        log { "attachAdView : $adUnitId" }
+        pendingAttach = false
+        log { "attachAdView : $currentAdUnit" }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -178,6 +192,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
         }
         binding.root.removeAllViews()
+        pendingAttach = false
         if (fallbackBanner.type == null || fallbackBanner.type.equals("image", true)) {
             binding.root.addView(imageView)
             loadFallbackImageAd(imageView, webView, fallbackBanner)
@@ -322,28 +337,28 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     fun setAdSizes(vararg adSizes: BannerAdSize) {
         this.currentAdSizes = bannerManager.convertVaragsToAdSizes(*adSizes)
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
-            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes, true)
         }
     }
 
     fun setAdUnitID(adUnitId: String) {
         this.currentAdUnit = adUnitId
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
-            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes, true)
         }
     }
 
     fun setAdType(adType: String) {
         this.adType = adType
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
-            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes, true)
         }
     }
 
     fun setVideoOptions(videoOptions: VideoOptions) {
         this.videoOptions = videoOptions
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
-            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes)
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes, true)
         }
     }
 
@@ -655,6 +670,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdLoaded()
             bannerManager.pendingImpression = true
             log { "Ad loaded with unit : $currentAdUnit" }
+            if (bannerManager.isSeemLessRefreshActive()) {
+                if (pendingAttach) {
+                    attachView()
+                }
+            }
             if (bannerManager.allowCallback(isRefreshLoaded)) {
                 bannerAdListener?.onAdLoaded(this@BannerAdView)
             }

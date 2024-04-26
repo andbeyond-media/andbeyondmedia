@@ -97,6 +97,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     private fun shouldBeActive() = shouldBeActive
 
+    fun isSeemLessRefreshActive(): Boolean {
+        return !(sdkConfig == null || !shouldBeActive || (sdkConfig?.seemlessRefresh ?: 0) == 0)
+    }
+
     fun convertStringSizesToAdSizes(adSizes: String): ArrayList<AdSize> {
         fun getAdSizeObj(adSize: String) = when (adSize) {
             "FLUID" -> AdSize.FLUID
@@ -547,7 +551,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, false)
             loadAd(active, unfilled, instantRefresh)
         }
 
@@ -659,7 +663,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, true)
             return createRequest(active = 1, newUnit = true).getAdRequest()
         } else if (checkHijack(bannerConfig.hijack)) {
             view.log { "checkOverride on ${bannerConfig.publisherAdUnit}, status : hijack" }
@@ -667,7 +671,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, true)
             return createRequest(active = 1, hijacked = true).getAdRequest()
         }
         return null
