@@ -50,6 +50,8 @@ internal data class SDKConfig(
         val switch: Int? = null,
         @SerializedName("seemless_refresh")
         val seemlessRefresh: Int? = null,
+        @SerializedName("seemless_refresh_fallback")
+        val seemlessRefreshFallback: Int? = null,
         @SerializedName("instant_refresh")
         val instantRefresh: Int? = null,
         @SerializedName("active")

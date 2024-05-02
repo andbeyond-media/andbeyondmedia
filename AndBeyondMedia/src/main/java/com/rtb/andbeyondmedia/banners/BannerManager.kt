@@ -388,7 +388,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adFailedToLoad(isPublisherLoad: Boolean, recalled: Boolean = false): Boolean {
         if (!recalled) {
             setCountryConfig()
-            view.log { "Failed with Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)} && Retry config : ${Gson().toJson(bannerConfig.retryConfig)}" }
+            view.log { "Failed with Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)} && Retry config : ${Gson().toJson(bannerConfig.retryConfig)} && isPubload : $isPublisherLoad" }
         }
 
         if (shouldBeActive) {
@@ -527,6 +527,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         passiveTimeCounter?.cancel()
         val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
         if (time <= 0) return
+        view.log { "Unfilled timer started with time :$time" }
         unfilledRefreshCounter?.cancel()
         unfilledRefreshCounter = object : CountDownTimer(time * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -879,6 +880,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
             return if (errorCode == -1) 0 else -1
+        }
+        if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1) {
+            return 0
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
             val matchedBanners = arrayListOf<Fallback.Banner>()

@@ -646,11 +646,17 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     false
                 }
             }
-            if (!retryStatus) {
-                bannerManager.startUnfilledRefreshCounter()
-            }
-            if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(p0.code, p0.message, p0.domain), retryStatus)
+            if (retryStatus || !bannerManager.isSeemLessRefreshActive()) {
+                if (!retryStatus) {
+                    bannerManager.startUnfilledRefreshCounter()
+                }
+                if (bannerManager.allowCallback(isRefreshLoaded)) {
+                    bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(p0.code, p0.message, p0.domain), retryStatus)
+                }
+            } else {
+                pendingAttach = false
+                onAdLoaded()
+                onAdImpression()
             }
         }
 
