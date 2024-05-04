@@ -65,6 +65,7 @@ import org.prebid.mobile.api.data.AdUnitFormat
 import java.io.IOException
 import java.util.Date
 import java.util.EnumSet
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 
@@ -850,7 +851,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
-        return overridingUnit ?: String.format("%s-%d", bannerConfig.customUnitName,
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", bannerConfig.customUnitName,
                 if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
     }
 
@@ -876,12 +877,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 
-    fun checkFallback(refreshLoad: Boolean, errorCode: Int): Int {
+    fun checkFallback(refreshLoad: Boolean, errorCode: Int, adEverLoaded: Boolean): Int {
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
             return if (errorCode == -1) 0 else -1
         }
-        if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1) {
+        if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1 && adEverLoaded) {
             return 0
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {

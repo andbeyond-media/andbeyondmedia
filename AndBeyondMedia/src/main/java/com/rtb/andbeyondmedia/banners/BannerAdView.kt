@@ -13,6 +13,7 @@ import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.allViews
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -65,6 +66,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private lateinit var mContext: Context
     private lateinit var binding: BannerAdViewBinding
     private lateinit var adView: AdManagerAdView
+    private var loadedAdView: AdManagerAdView? = null
+    private var loadedOWView: POBBannerView? = null
     private lateinit var pobBanner: POBBannerView
     private lateinit var bannerManager: BannerManager
     private var adType: String = AdTypes.BANNER
@@ -79,6 +82,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private var owDebugState: Boolean? = null
     private var owTestMode: Boolean? = null
     private var pendingAttach: Boolean = false
+    private var adEverLoaded: Boolean = false
 
     constructor(context: Context) : super(context) {
         init(context, null)
@@ -125,6 +129,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (adUnitId.isNotEmpty() && adSizes.isNotEmpty()) {
                     attachAdView(adUnitId, bannerManager.convertStringSizesToAdSizes(adSizes), true)
                 }
+            }.also { info ->
+                info.recycle()
             }
         }
     }
@@ -134,8 +140,29 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     }
 
     override fun attachAdView(adUnitId: String, adSizes: List<AdSize>, attach: Boolean) {
-        if (this::adView.isInitialized) adView.destroy()
-        if (this::pobBanner.isInitialized) pobBanner.destroy()
+        if (bannerManager.isSeemLessRefreshActive()) {
+            if (this::adView.isInitialized) {
+                if (adView.tag == "loaded") {
+                    log { "loaded view is getting stored" }
+                    loadedAdView = adView
+                } else {
+                    log { "failed view is getting destroyed" }
+                    adView.destroy()
+                }
+            }
+            if (this::pobBanner.isInitialized) {
+                if (pobBanner.tag == "loaded") {
+                    log { "loaded pubmatic view is getting stored" }
+                    loadedOWView = pobBanner
+                } else {
+                    log { "failed pubmatic view is getting destroyed" }
+                    pobBanner.destroy()
+                }
+            }
+        } else {
+            if (this::adView.isInitialized) adView.destroy()
+            if (this::pobBanner.isInitialized) pobBanner.destroy()
+        }
         adView = AdManagerAdView(mContext)
         adView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         if (adSizes.none { it == AdSize.FLUID }) {
@@ -168,6 +195,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     private fun attachView() {
         try {
+            loadedAdView?.destroy()
+            loadedOWView?.destroy()
             binding.root.removeAllViews()
             binding.root.addView(adView)
         } catch (_: Throwable) {
@@ -426,10 +455,12 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         binding.root.addView(banner)
         banner.setListener(object : POBBannerViewListener() {
             override fun onAdFailed(p0: POBBannerView, p1: POBError) {
+                pobBanner.tag = ""
                 adListener.onAdFailedToLoad(LoadAdError(0, p1.errorMessage, "", null, null))
             }
 
             override fun onAdReceived(p0: POBBannerView) {
+                pobBanner.tag = "loaded"
                 adListener.onAdLoaded()
                 adListener.onAdImpression()
             }
@@ -588,7 +619,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     layoutParams = LayoutParams(context.dpToPx(1), context.dpToPx(1))
                     loadData(it, "text/html; charset=utf-8", "UTF-8")
                 }
+                webView.tag = "impression"
                 log { "Adunit $currentAdUnit impressed on adlooks" }
+                binding.root.allViews.firstOrNull { it.tag == "impression" }?.let { view ->
+                    binding.root.removeView(view)
+                }
                 binding.root.addView(webView)
             } catch (_: Throwable) {
             }
@@ -636,7 +671,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             if (!retryStatus) {
                 retryStatus = try {
-                    val fallbackCode = bannerManager.checkFallback(isRefreshLoaded, p0.code)
+                    val fallbackCode = bannerManager.checkFallback(isRefreshLoaded, p0.code, adEverLoaded)
                     when (fallbackCode) {
                         -1 -> directOpenRtb()
                         1 -> true
@@ -646,7 +681,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                     false
                 }
             }
-            if (retryStatus || !bannerManager.isSeemLessRefreshActive()) {
+            if (retryStatus || !bannerManager.isSeemLessRefreshActive() || !adEverLoaded) {
                 if (!retryStatus) {
                     bannerManager.startUnfilledRefreshCounter()
                 }
@@ -657,11 +692,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 pendingAttach = false
                 onAdLoaded()
                 onAdImpression()
+                adView.tag = ""
             }
         }
 
         override fun onAdImpression() {
             super.onAdImpression()
+            adEverLoaded = true
+            adView.tag = "loaded"
             bannerManager.adImpressed()
             bannerManager.pendingImpression = false
             if (bannerManager.allowCallback(isRefreshLoaded)) {
