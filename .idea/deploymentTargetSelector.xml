@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-05-01T19:18:02.829566400Z">
+        <DropdownSelection timestamp="2024-05-11T15:02:37.468740Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=096363135N040031" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/sonusony/.android/avd/Pixel_5_33_13_.avd" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -15,12 +15,17 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\sonus\.android\avd\Phone_34_14_.avd" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=RZCX119RBYZ" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
                 <DeviceId pluginId="PhysicalDevice" identifier="serial=096363135N040031" />
+              </handle>
+            </Target>
+            <Target type="DEFAULT_BOOT">
+              <handle>
+                <DeviceId pluginId="LocalEmulator" identifier="path=/Users/sonusony/.android/avd/Pixel_5_33_13_.avd" />
               </handle>
             </Target>
           </targets>

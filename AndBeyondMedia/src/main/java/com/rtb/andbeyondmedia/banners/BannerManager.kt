@@ -395,8 +395,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (shouldBeActive) {
             if (isPublisherLoad && !bannerConfig.isNewUnitApplied()) {
                 return if (bannerConfig.unFilled?.status == 1) {
-                    refresh(unfilled = true)
-                    true
+                    if (bannerConfig.unFilled?.regionWise == 1 && countrySetup.third != null && (isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+                        false
+                    } else {
+                        refresh(unfilled = true)
+                        true
+                    }
                 } else {
                     false
                 }
@@ -437,16 +441,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     isNetworkBlocked = true
                 }
             }
-            var isRegionBlocked = false
-            if (sdkConfig?.countryStatus?.active == 1 &&
-                    (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
-                            (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
-                            (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
-            ) {
-                isRegionBlocked = true
-            }
 
-            if (!isNetworkBlocked && !isRegionBlocked
+
+            if (!isNetworkBlocked && !isRegionBlocked()
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
@@ -680,11 +677,29 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
-        return if (hijackConfig?.status == 1) {
-            val number = (1..100).random()
-            number in 1..(hijackConfig.per ?: 100)
+        if (hijackConfig?.regionWise == 1) {
+            return if (countrySetup.third == null) {
+                false
+            } else {
+                if (hijackConfig.status == 1) {
+                    if (ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || isRegionBlocked()) {
+                        false
+                    } else {
+                        val number = (1..100).random()
+                        number in 1..(hijackConfig.per ?: 100)
+                    }
+                } else {
+                    false
+                }
+
+            }
         } else {
-            false
+            return if (hijackConfig?.status == 1) {
+                val number = (1..100).random()
+                number in 1..(hijackConfig.per ?: 100)
+            } else {
+                false
+            }
         }
     }
 
@@ -946,6 +961,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
             view.log { "Blocking refresh on : $adUnit" }
         }
         return hold
+    }
+
+    private fun isRegionBlocked(): Boolean {
+        var isRegionBlocked = false
+        if (sdkConfig?.countryStatus?.active == 1 &&
+                (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                        (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                        (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
+        ) {
+            isRegionBlocked = true
+        }
+        return isRegionBlocked
     }
 
     private fun ifUnitOnRegionalHold(adUnit: String): Boolean {

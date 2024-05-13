@@ -396,7 +396,9 @@ internal data class SDKConfig(
             @SerializedName("per")
             val per: Int? = null,
             @SerializedName("number")
-            val number: Int? = null
+            val number: Int? = null,
+            @SerializedName("region_wise")
+            val regionWise: Int? = null
     )
 
     @Keep
