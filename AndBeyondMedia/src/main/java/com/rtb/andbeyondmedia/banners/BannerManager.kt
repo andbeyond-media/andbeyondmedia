@@ -395,7 +395,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (shouldBeActive) {
             if (isPublisherLoad && !bannerConfig.isNewUnitApplied()) {
                 return if (bannerConfig.unFilled?.status == 1) {
-                    if (bannerConfig.unFilled?.regionWise == 1 && countrySetup.third != null && (isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+                    if (bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
                         false
                     } else {
                         refresh(unfilled = true)
@@ -898,6 +898,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
             return if (errorCode == -1) 0 else -1
         }
         if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1 && adEverLoaded) {
+            return 0
+        }
+        if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) && bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
             return 0
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
