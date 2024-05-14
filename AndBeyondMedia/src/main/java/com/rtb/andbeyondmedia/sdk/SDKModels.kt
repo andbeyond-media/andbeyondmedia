@@ -48,6 +48,10 @@ internal data class SDKConfig(
         val networkCode: String? = null,
         @SerializedName("global")
         val switch: Int? = null,
+        @SerializedName("seemless_refresh")
+        val seemlessRefresh: Int? = null,
+        @SerializedName("seemless_refresh_fallback")
+        val seemlessRefreshFallback: Int? = null,
         @SerializedName("instant_refresh")
         val instantRefresh: Int? = null,
         @SerializedName("active")
@@ -392,7 +396,9 @@ internal data class SDKConfig(
             @SerializedName("per")
             val per: Int? = null,
             @SerializedName("number")
-            val number: Int? = null
+            val number: Int? = null,
+            @SerializedName("region_wise")
+            val regionWise: Int? = null
     )
 
     @Keep

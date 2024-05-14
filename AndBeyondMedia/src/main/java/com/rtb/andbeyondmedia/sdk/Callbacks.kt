@@ -6,7 +6,7 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.intersitial.InterstitialAd
 
 internal interface BannerManagerListener {
-    fun attachAdView(adUnitId: String, adSizes: List<AdSize>)
+    fun attachAdView(adUnitId: String, adSizes: List<AdSize>, attach: Boolean)
 
     fun attachFallback(fallbackBanner: Fallback.Banner)
 

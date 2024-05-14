@@ -65,6 +65,7 @@ import org.prebid.mobile.api.data.AdUnitFormat
 import java.io.IOException
 import java.util.Date
 import java.util.EnumSet
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 
@@ -96,6 +97,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     private fun shouldBeActive() = shouldBeActive
+
+    fun isSeemLessRefreshActive(): Boolean {
+        return !(sdkConfig == null || !shouldBeActive || (sdkConfig?.seemlessRefresh ?: 0) == 0)
+    }
 
     fun convertStringSizesToAdSizes(adSizes: String): ArrayList<AdSize> {
         fun getAdSizeObj(adSize: String) = when (adSize) {
@@ -384,14 +389,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adFailedToLoad(isPublisherLoad: Boolean, recalled: Boolean = false): Boolean {
         if (!recalled) {
             setCountryConfig()
-            view.log { "Failed with Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)} && Retry config : ${Gson().toJson(bannerConfig.retryConfig)}" }
+            view.log { "Failed with Unfilled Config: ${Gson().toJson(bannerConfig.unFilled)} && Retry config : ${Gson().toJson(bannerConfig.retryConfig)} && isPubload : $isPublisherLoad" }
         }
 
         if (shouldBeActive) {
             if (isPublisherLoad && !bannerConfig.isNewUnitApplied()) {
                 return if (bannerConfig.unFilled?.status == 1) {
-                    refresh(unfilled = true)
-                    true
+                    if (bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+                        false
+                    } else {
+                        refresh(unfilled = true)
+                        true
+                    }
                 } else {
                     false
                 }
@@ -432,16 +441,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     isNetworkBlocked = true
                 }
             }
-            var isRegionBlocked = false
-            if (sdkConfig?.countryStatus?.active == 1 &&
-                    (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
-                            (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
-                            (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
-            ) {
-                isRegionBlocked = true
-            }
 
-            if (!isNetworkBlocked && !isRegionBlocked
+
+            if (!isNetworkBlocked && !isRegionBlocked()
                     && !(!loadedAdapter?.adSourceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceId))
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
@@ -523,6 +525,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         passiveTimeCounter?.cancel()
         val time = sdkConfig?.unfilledTimerConfig?.time?.toLong() ?: 0L
         if (time <= 0) return
+        view.log { "Unfilled timer started with time :$time" }
         unfilledRefreshCounter?.cancel()
         unfilledRefreshCounter = object : CountDownTimer(time * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -547,7 +550,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, false)
             loadAd(active, unfilled, instantRefresh)
         }
 
@@ -659,7 +662,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, true)
             return createRequest(active = 1, newUnit = true).getAdRequest()
         } else if (checkHijack(bannerConfig.hijack)) {
             view.log { "checkOverride on ${bannerConfig.publisherAdUnit}, status : hijack" }
@@ -667,18 +670,36 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 if (ifNativePossible() && !this.contains(AdSize.FLUID)) {
                     add(AdSize.FLUID)
                 }
-            })
+            }, true)
             return createRequest(active = 1, hijacked = true).getAdRequest()
         }
         return null
     }
 
     private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
-        return if (hijackConfig?.status == 1) {
-            val number = (1..100).random()
-            number in 1..(hijackConfig.per ?: 100)
+        if (hijackConfig?.regionWise == 1) {
+            return if (countrySetup.third == null) {
+                false
+            } else {
+                if (hijackConfig.status == 1) {
+                    if (ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || isRegionBlocked()) {
+                        false
+                    } else {
+                        val number = (1..100).random()
+                        number in 1..(hijackConfig.per ?: 100)
+                    }
+                } else {
+                    false
+                }
+
+            }
         } else {
-            false
+            return if (hijackConfig?.status == 1) {
+                val number = (1..100).random()
+                number in 1..(hijackConfig.per ?: 100)
+            } else {
+                false
+            }
         }
     }
 
@@ -845,7 +866,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
-        return overridingUnit ?: String.format("%s-%d", bannerConfig.customUnitName,
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", bannerConfig.customUnitName,
                 if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
     }
 
@@ -871,10 +892,16 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return !refreshLoad || sdkConfig?.infoConfig?.refreshCallbacks == 1
     }
 
-    fun checkFallback(refreshLoad: Boolean, errorCode: Int): Int {
+    fun checkFallback(refreshLoad: Boolean, errorCode: Int, adEverLoaded: Boolean): Int {
         bannerConfig.retryConfig = getRetryConfig()
         if (isInter) {
             return if (errorCode == -1) 0 else -1
+        }
+        if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1 && adEverLoaded) {
+            return 0
+        }
+        if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) && bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+            return 0
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
             val matchedBanners = arrayListOf<Fallback.Banner>()
@@ -937,6 +964,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
             view.log { "Blocking refresh on : $adUnit" }
         }
         return hold
+    }
+
+    private fun isRegionBlocked(): Boolean {
+        var isRegionBlocked = false
+        if (sdkConfig?.countryStatus?.active == 1 &&
+                (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countrySetup.third?.city, true) } == true ||
+                        (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countrySetup.third?.state, true) } == true) ||
+                        (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countrySetup.third?.countryCode, true) } == true))
+        ) {
+            isRegionBlocked = true
+        }
+        return isRegionBlocked
     }
 
     private fun ifUnitOnRegionalHold(adUnit: String): Boolean {
