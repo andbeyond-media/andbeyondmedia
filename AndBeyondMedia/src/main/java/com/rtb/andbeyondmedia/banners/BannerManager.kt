@@ -866,8 +866,13 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean = false): String {
-        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", bannerConfig.customUnitName,
-                if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
+        if (bannerConfig.refreshCount == 2) {
+            refreshBlocked = true
+            return "12345"
+        } else {
+            return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", bannerConfig.customUnitName,
+                    if (unfilled) bannerConfig.unFilled?.number else if (newUnit) bannerConfig.newUnit?.number else if (hijacked) bannerConfig.hijack?.number else bannerConfig.position)
+        }
     }
 
     fun adPaused() {

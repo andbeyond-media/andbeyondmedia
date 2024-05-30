@@ -57,6 +57,30 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         val adRequest = AdRequest().Builder().addCustomTargeting("hb_format", "amp").build()
         binding.bannerAd.loadAd(adRequest)
         binding.bannerAd.setAdListener(this)
+
+        binding.bannerAd2.setAdListener(object : BannerAdListener {
+            override fun onAdClicked(bannerAdView: BannerAdView) {
+            }
+
+            override fun onAdClosed(bannerAdView: BannerAdView) {
+            }
+
+            override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
+                Log.d("Sonu", "2nd onAdFailedToLoad: $retrying")
+            }
+
+            override fun onAdImpression(bannerAdView: BannerAdView) {
+                Log.d("Sonu", "2nd onAdImpression: ")
+            }
+
+            override fun onAdLoaded(bannerAdView: BannerAdView) {
+                Log.d("Sonu", "2nd onAdLoaded: ")
+            }
+
+            override fun onAdOpened(bannerAdView: BannerAdView) {}
+
+        })
+        binding.bannerAd2.loadAd(adRequest)
     }
 
     private fun loadNative() {
@@ -182,15 +206,22 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     }
 
     override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
-        Log.d("Ads", "onAdFailedToLoad & Retrying $retrying")
+        Log.d("Sonu", "onAdFailedToLoad & Retrying $retrying")
     }
 
     override fun onAdImpression(bannerAdView: BannerAdView) {
-        Log.d("Ads", "onAdImpression: ")
+        Log.d("Sonu", "onAdImpression: ")
     }
 
+    var adLives = 2
+
     override fun onAdLoaded(bannerAdView: BannerAdView) {
-        Log.d("Ads", "onAdLoaded: ")
+        Log.d("Sonu", "onAdLoaded: ")
+        if (adLives <= 0) {
+            binding.root.removeView(binding.bannerAd)
+        } else {
+            adLives--
+        }
     }
 
     override fun onAdOpened(bannerAdView: BannerAdView) {

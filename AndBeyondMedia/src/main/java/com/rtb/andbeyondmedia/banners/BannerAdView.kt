@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.AttributeSet
+import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -53,6 +54,7 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.Fallback
+import com.rtb.andbeyondmedia.sdk.SavedViews
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -414,7 +416,11 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${adRequest.customTargeting}" }
                 isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
-                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
+                bannerManager.fetchDemand(firstLook, adRequest) {
+                    adView.id = (0..Int.MAX_VALUE).random()
+                    SavedViews.saveView(adView)
+                    adView.loadAd(it)
+                }
             }
         }
         if (firstLook) {
@@ -664,6 +670,17 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (firstLook) {
                 firstLook = false
             }
+            val preLoadedAd = SavedViews.getLoadedAd()
+            if (preLoadedAd != null) {
+                Log.d("Sonu", "loading preloaded view: ")
+                SavedViews.clearViews(preLoadedAd)
+                preLoadedAd.adListener = this
+                adView = preLoadedAd
+                onAdLoaded()
+                attachView()
+                return
+            }
+
             var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
             } catch (e: Throwable) {
@@ -700,6 +717,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdImpression()
             adEverLoaded = true
             adView.tag = "loaded"
+            SavedViews.clearViews(adView)
             bannerManager.adImpressed()
             bannerManager.pendingImpression = false
             if (bannerManager.allowCallback(isRefreshLoaded)) {
