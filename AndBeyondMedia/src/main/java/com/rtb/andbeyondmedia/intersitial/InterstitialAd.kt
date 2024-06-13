@@ -20,9 +20,14 @@ class InterstitialAd(private val context: Activity, private val adUnit: String) 
     private var listener: InterstitialAdListener? = null
 
     fun load(adRequest: AdRequest, callBack: (loaded: Boolean) -> Unit) {
-        interstitialAdManager.load(adRequest) {
-            mInterstitialAd = it
+        interstitialAdManager.load(adRequest) { ad, error ->
+            mInterstitialAd = ad
             callBack(mInterstitialAd != null)
+            if (ad != null) {
+                listener?.onAdReceived(this@InterstitialAd)
+            } else {
+                listener?.onAdFailedToLoad(this@InterstitialAd, error ?: ABMError(3, "No Fill"))
+            }
         }
     }
 
@@ -45,12 +50,12 @@ class InterstitialAd(private val context: Activity, private val adUnit: String) 
     fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener? = null) {
         interstitialAdManager.loadWithOW(pubID, profile, owAdUnitId, configListener, {
             pobInterstitial = it
-        }, {
-            mInterstitialAd = it
+        }, { ad, error ->
+            mInterstitialAd = ad
             if (mInterstitialAd != null) {
                 listener?.onAdReceived(this)
             } else {
-                listener?.onAdFailedToLoad(this, ABMError(10))
+                listener?.onAdFailedToLoad(this, error ?: ABMError(3, "No Fill"))
             }
         }, object : POBInterstitial.POBInterstitialListener() {
             override fun onAdReceived(p0: POBInterstitial) {
