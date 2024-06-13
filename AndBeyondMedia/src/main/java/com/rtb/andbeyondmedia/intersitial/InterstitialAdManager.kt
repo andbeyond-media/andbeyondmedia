@@ -28,6 +28,7 @@ import com.pubmatic.sdk.openwrap.interstitial.POBInterstitial
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
+import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.SDKConfig
@@ -60,7 +61,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
-                   callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+                   callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?, error: ABMError?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
         shouldSetConfig {
             if (it) {
                 setConfig()
@@ -84,7 +85,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun loadOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
-                       callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
+                       callBack1: (interstitialAd: POBInterstitial?) -> Unit, callBack2: (interstitialAd: AdManagerInterstitialAd?, error: ABMError?) -> Unit, listener: POBInterstitial.POBInterstitialListener) {
         adUnit.log { "loading $adUnit by Pubmatic with pub id : $pubID, profile : $profile, owUnit : $owAdUnitId" }
         val eventHandler = DFPInterstitialEventHandler(context, adUnit)
         configListener?.let { eventHandler.setConfigListener(it) }
@@ -129,8 +130,9 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                 if (firstLook) {
                     firstLook = false
                 }
+                val abmError = ABMError(p1.errorCode, p1.errorMessage)
                 try {
-                    adFailedToLoad(tempStatus, callBack2)
+                    adFailedToLoad(tempStatus, callBack2, abmError)
                 } catch (e: Throwable) {
                     e.printStackTrace()
                     callBack1(null)
@@ -145,10 +147,10 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         interstitial.loadAd()
     }
 
-    fun load(adRequest: AdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+    fun load(adRequest: AdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?, error: ABMError?) -> Unit) {
         var adManagerAdRequest = adRequest.getAdRequest()
         if (adManagerAdRequest == null) {
-            callBack(null)
+            callBack(null, null)
             return
         }
         shouldSetConfig {
@@ -184,7 +186,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         }
     }
 
-    private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+    private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (interstitialAd: AdManagerInterstitialAd?, error: ABMError?) -> Unit, previousError: ABMError? = null) {
         otherUnit = adUnit != this.adUnit
         this.adUnit.log { "loading $adUnit by GAM" }
         fetchDemand(adRequest) { finalRequest ->
@@ -193,7 +195,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     this@InterstitialAdManager.adUnit.log { "loaded $adUnit by GAM" }
                     interstitialConfig.retryConfig = sdkConfig?.retryConfig
                     addGeoEdge(AdSdk.GAM, interstitialAd, otherUnit)
-                    callBack(interstitialAd)
+                    callBack(interstitialAd, null)
                     firstLook = false
                 }
 
@@ -203,10 +205,11 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     if (firstLook) {
                         firstLook = false
                     }
+                    val abmError = previousError ?: ABMError(adError.code, adError.message)
                     try {
-                        adFailedToLoad(tempStatus, callBack)
+                        adFailedToLoad(tempStatus, callBack, abmError)
                     } catch (_: Throwable) {
-                        callBack(null)
+                        callBack(null, abmError)
                     }
                 }
             })
@@ -232,12 +235,12 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         }
     }
 
-    private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?) -> Unit) {
+    private fun adFailedToLoad(firstLook: Boolean, callBack: (interstitialAd: AdManagerInterstitialAd?, error: ABMError?) -> Unit, abmError: ABMError) {
         adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(interstitialConfig.unFilled)} && Retry config : ${Gson().toJson(interstitialConfig.retryConfig)}" }
         fun requestAd() {
             interstitialConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
-                loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
+                loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack, abmError)
             }
         }
         if (shouldBeActive) {
@@ -254,20 +257,20 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                                 requestAd()
                             } ?: kotlin.run {
                                 overridingUnit = null
-                                callBack(null)
+                                callBack(null, abmError)
                             }
                         }, (interstitialConfig.retryConfig?.retryInterval ?: 0).toLong() * 1000)
                     } else {
                         overridingUnit = null
-                        callBack(null)
+                        callBack(null, abmError)
                     }
                 }
             } else {
-                callBack(null)
+                callBack(null, abmError)
             }
 
         } else {
-            callBack(null)
+            callBack(null, abmError)
         }
     }
 
@@ -324,7 +327,8 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
+        return "12345"
+        // return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
