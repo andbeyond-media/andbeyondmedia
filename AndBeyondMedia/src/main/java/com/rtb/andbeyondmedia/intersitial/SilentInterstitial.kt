@@ -3,7 +3,6 @@ package com.rtb.andbeyondmedia.intersitial
 import android.app.Activity
 import android.content.Context
 import android.os.CountDownTimer
-import android.util.Log
 import android.view.View
 import android.view.Window
 import android.widget.ImageButton
@@ -46,7 +45,6 @@ internal class SilentInterstitial {
             tag.log { activity.localClassName }
             activities.add(activity)
         }
-        Log.d("Sonu", "registerActivity: ${activities.size}")
     }
 
     fun init(context: Context) {

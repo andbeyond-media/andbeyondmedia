@@ -31,6 +31,7 @@ import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,7 @@ import java.util.EnumSet
 internal class InterstitialAdManager(private val context: Activity, private val adUnit: String) {
 
     private var sdkConfig: SDKConfig? = null
+    private var countryData: CountryModel? = null
     private var interstitialConfig: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
     private val storeService = AndBeyondMedia.getStoreService(context)
@@ -57,6 +59,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
 
     init {
         sdkConfig = storeService.config
+        countryData = storeService.detectedCountry
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
@@ -177,12 +180,42 @@ internal class InterstitialAdManager(private val context: Activity, private val 
         }
     }
 
+    private fun getRegionalHijackPercentage(): Int {
+        var percentage = 0
+        if (sdkConfig?.countryStatus?.active == 1 && countryData != null) {
+            interstitialConfig.hijack?.regionalPercentage?.firstOrNull { region ->
+                region.getCities().any { it.equals(countryData?.city, true) }
+                        || region.getStates().any { it.equals(countryData?.state, true) }
+                        || region.getCountries().any { it.equals(countryData?.countryCode, true) }
+                        || region.getCountries().any { it.equals("default", true) }
+            }?.let {
+                percentage = it.percentage ?: 0
+            }
+        }
+        return percentage
+    }
+
     private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
-        return if (hijackConfig?.status == 1) {
-            val number = (1..100).random()
-            number in 1..(hijackConfig.per ?: 100)
+        if (hijackConfig?.regionWise == 1) {
+            return if (countryData == null) {
+                false
+            } else {
+                if (hijackConfig.status == 1) {
+                    val per = getRegionalHijackPercentage()
+                    val number = (1..100).random()
+                    number in 1..per
+                } else {
+                    false
+                }
+
+            }
         } else {
-            false
+            return if (hijackConfig?.status == 1) {
+                val number = (1..100).random()
+                number in 1..(hijackConfig.per ?: 0)
+            } else {
+                false
+            }
         }
     }
 

@@ -197,6 +197,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (!shouldBeActive()) return
         if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it, true) } == true) {
             shouldBeActive = false
+            view.log { "Complete shutdown due to block" }
             return
         }
         val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(pubAdUnit, true) == true || config.type == adType || config.type.equals("all", true) }
@@ -432,7 +433,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adLoaded(firstLook: Boolean, loadedUnit: String, loadedAdapter: AdapterResponseInfo?) {
         adImpressed()
         setCountryConfig()
-        if (sdkConfig?.switch == 1 && !refreshBlocked && !isInter) {
+        if (sdkConfig?.switch == 1 && !refreshBlocked && !isInter && shouldBeActive) {
             overridingUnit = null
             bannerConfig.retryConfig = getRetryConfig()
             unfilledRefreshCounter?.cancel()
@@ -687,8 +688,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     if (ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || isRegionBlocked() || ifSectionOnRegionalHold(section)) {
                         false
                     } else {
+                        val per = getRegionalHijackPercentage()
                         val number = (1..100).random()
-                        number in 1..(hijackConfig.per ?: 100)
+                        number in 1..per
                     }
                 } else {
                     false
@@ -698,7 +700,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } else {
             return if (hijackConfig?.status == 1) {
                 val number = (1..100).random()
-                number in 1..(hijackConfig.per ?: 100)
+                number in 1..(hijackConfig.per ?: 0)
             } else {
                 false
             }
@@ -758,6 +760,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
             prebidAvailable = false
         }
         if (sdkConfig?.aps?.whitelistedFormats != null && sdkConfig?.aps?.whitelistedFormats?.contains(AdTypes.BANNER) == false) {
+            apsAvailable = false
+        }
+
+        if (!shouldBeActive) {
+            prebidAvailable = false
             apsAvailable = false
         }
 
@@ -994,7 +1001,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
         if (hold) {
-            view.log { "Regional blocking refresh on : $adUnit" }
+            view.log { "Regional blocking refresh on unit : $adUnit" }
         }
         return hold
     }
@@ -1015,6 +1022,21 @@ internal class BannerManager(private val context: Context, private val bannerLis
             view.log { "Regional blocking refresh on section : $section" }
         }
         return hold
+    }
+
+    private fun getRegionalHijackPercentage(): Int {
+        var percentage = 0
+        if (sdkConfig?.countryStatus?.active == 1 && countrySetup.third != null) {
+            bannerConfig.hijack?.regionalPercentage?.firstOrNull { region ->
+                region.getCities().any { it.equals(countrySetup.third?.city, true) }
+                        || region.getStates().any { it.equals(countrySetup.third?.state, true) }
+                        || region.getCountries().any { it.equals(countrySetup.third?.countryCode, true) }
+                        || region.getCountries().any { it.equals("default", true) }
+            }?.let {
+                percentage = it.percentage ?: 0
+            }
+        }
+        return percentage
     }
 
     fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit): Boolean {
