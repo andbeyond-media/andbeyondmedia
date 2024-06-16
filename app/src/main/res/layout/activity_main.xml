@@ -118,6 +118,7 @@
         app:adUnitId="/6499/example/banner"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:section="Home" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -85,6 +85,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var refreshBlocked = false
     internal var isInter = false
     private var adType: String = ""
+    private var section: String = ""
     private var pubAdSizes: ArrayList<AdSize> = arrayListOf()
     private var countrySetup = Triple<Boolean, Boolean, CountryModel?>(false, false, null) //fetched, applied, config
     private var userLocation = Pair<Location?, Address?>(null, null)
@@ -191,11 +192,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }, 4000)
     }
 
-    fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String) {
+    fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String, section: String) {
         view.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive()) return
-        if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it) } == true) {
+        if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it, true) } == true) {
             shouldBeActive = false
+            view.log { "Complete shutdown due to block" }
             return
         }
         val validConfig = sdkConfig?.refreshConfig?.firstOrNull { config -> config.specific?.equals(pubAdUnit, true) == true || config.type == adType || config.type.equals("all", true) }
@@ -204,6 +206,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             return
         }
         this.adType = adType
+        this.section = section
         this.pubAdSizes = adSizes
         bannerConfig.apply {
             instantRefresh = sdkConfig?.instantRefresh
@@ -395,7 +398,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (shouldBeActive) {
             if (isPublisherLoad && !bannerConfig.isNewUnitApplied()) {
                 return if (bannerConfig.unFilled?.status == 1) {
-                    if (bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+                    if (bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || ifSectionOnRegionalHold(section))) {
                         false
                     } else {
                         refresh(unfilled = true)
@@ -430,7 +433,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     fun adLoaded(firstLook: Boolean, loadedUnit: String, loadedAdapter: AdapterResponseInfo?) {
         adImpressed()
         setCountryConfig()
-        if (sdkConfig?.switch == 1 && !refreshBlocked && !isInter) {
+        if (sdkConfig?.switch == 1 && !refreshBlocked && !isInter && shouldBeActive) {
             overridingUnit = null
             bannerConfig.retryConfig = getRetryConfig()
             unfilledRefreshCounter?.cancel()
@@ -448,7 +451,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     && !(!loadedAdapter?.adSourceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceName))
                     && !(!loadedAdapter?.adSourceInstanceId.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceId))
                     && !(!loadedAdapter?.adSourceInstanceName.isNullOrEmpty() && blockedTerms.contains(loadedAdapter?.adSourceInstanceName))
-                    && !ifUnitOnHold(loadedUnit) && !ifUnitOnRegionalHold(loadedUnit)) {
+                    && !ifUnitOnHold(loadedUnit) && !ifUnitOnRegionalHold(loadedUnit) && !ifSectionOnRegionalHold(section)) {
                 startRefreshing(resetVisibleTime = true, isPublisherLoad = firstLook)
             } else {
                 refreshBlocked = true
@@ -682,11 +685,12 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 false
             } else {
                 if (hijackConfig.status == 1) {
-                    if (ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || isRegionBlocked()) {
+                    if (ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || isRegionBlocked() || ifSectionOnRegionalHold(section)) {
                         false
                     } else {
+                        val per = getRegionalHijackPercentage()
                         val number = (1..100).random()
-                        number in 1..(hijackConfig.per ?: 100)
+                        number in 1..per
                     }
                 } else {
                     false
@@ -696,7 +700,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         } else {
             return if (hijackConfig?.status == 1) {
                 val number = (1..100).random()
-                number in 1..(hijackConfig.per ?: 100)
+                number in 1..(hijackConfig.per ?: 0)
             } else {
                 false
             }
@@ -756,6 +760,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
             prebidAvailable = false
         }
         if (sdkConfig?.aps?.whitelistedFormats != null && sdkConfig?.aps?.whitelistedFormats?.contains(AdTypes.BANNER) == false) {
+            apsAvailable = false
+        }
+
+        if (!shouldBeActive) {
+            prebidAvailable = false
             apsAvailable = false
         }
 
@@ -900,7 +909,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
         if (sdkConfig?.seemlessRefresh == 1 && sdkConfig?.seemlessRefreshFallback != 1 && adEverLoaded) {
             return 0
         }
-        if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) && bannerConfig.unFilled?.regionWise == 1 && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit))) {
+        if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) && bannerConfig.unFilled?.regionWise == 1
+                && (countrySetup.third == null || isRegionBlocked() || ifUnitOnRegionalHold(bannerConfig.publisherAdUnit) || ifSectionOnRegionalHold(section))) {
             return 0
         }
         if ((!refreshLoad && bannerConfig.fallback?.firstlook == 1) || (refreshLoad && bannerConfig.fallback?.other == 1)) {
@@ -991,9 +1001,42 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
         if (hold) {
-            view.log { "Regional blocking refresh on : $adUnit" }
+            view.log { "Regional blocking refresh on unit : $adUnit" }
         }
         return hold
+    }
+
+    private fun ifSectionOnRegionalHold(section: String): Boolean {
+        var hold = false
+        if (sdkConfig?.countryStatus?.active == 1) {
+            sdkConfig?.sectionRegionalHalt?.forEach { region ->
+                if ((region.getCities().any { it.equals(countrySetup.third?.city, true) }
+                                || region.getStates().any { it.equals(countrySetup.third?.state, true) }
+                                || region.getCountries().any { it.equals(countrySetup.third?.countryCode, true) })
+                        && (region.sections?.any { section.contains(it, true) } == true)) {
+                    hold = true
+                }
+            }
+        }
+        if (hold) {
+            view.log { "Regional blocking refresh on section : $section" }
+        }
+        return hold
+    }
+
+    private fun getRegionalHijackPercentage(): Int {
+        var percentage = 0
+        if (sdkConfig?.countryStatus?.active == 1 && countrySetup.third != null) {
+            bannerConfig.hijack?.regionalPercentage?.firstOrNull { region ->
+                region.getCities().any { it.equals(countrySetup.third?.city, true) }
+                        || region.getStates().any { it.equals(countrySetup.third?.state, true) }
+                        || region.getCountries().any { it.equals(countrySetup.third?.countryCode, true) }
+                        || region.getCountries().any { it.equals("default", true) }
+            }?.let {
+                percentage = it.percentage ?: 0
+            }
+        }
+        return percentage
     }
 
     fun initiateOpenRTB(adSize: AdSize, onResponse: (Pair<String, String>) -> Unit, onFailure: () -> Unit): Boolean {

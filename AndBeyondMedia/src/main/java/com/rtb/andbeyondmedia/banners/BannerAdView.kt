@@ -71,6 +71,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private lateinit var pobBanner: POBBannerView
     private lateinit var bannerManager: BannerManager
     private var adType: String = AdTypes.BANNER
+    private var section: String = "App"
     private lateinit var currentAdUnit: String
     private lateinit var currentAdSizes: List<AdSize>
     private var videoOptions: VideoOptions? = null
@@ -122,6 +123,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 val adSize = getString(R.styleable.BannerAdView_adSize)
                 var adSizes = getString(R.styleable.BannerAdView_adSizes) ?: "BANNER"
                 adType = getString(R.styleable.BannerAdView_adType) ?: AdTypes.BANNER
+                section = getString(R.styleable.BannerAdView_section) ?: "App"
                 if (adSize != null && !adSizes.contains(adSize)) {
                     adSizes = if (adSizes.isEmpty()) adSize
                     else String.format(Locale.ENGLISH, "%s,%s", adSizes, adSize)
@@ -384,6 +386,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
+    fun setSection(section: String) {
+        this.section = section
+        if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
+            attachAdView(adUnitId = currentAdUnit, adSizes = currentAdSizes, true)
+        }
+    }
+
     fun setVideoOptions(videoOptions: VideoOptions) {
         this.videoOptions = videoOptions
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
@@ -420,7 +429,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         if (firstLook) {
             bannerManager.shouldSetConfig {
                 if (it) {
-                    bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                    bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType, section)
                     adRequest = bannerManager.checkOverride() ?: adRequest
                     bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.GAM, adView, true) }
                 }
@@ -480,7 +489,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         bannerManager.shouldSetConfig {
             var adRequest: AdManagerAdRequest? = null
             if (it) {
-                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType, section)
                 log { "attach pubmatic with publisher : $pubID, profile : $profile, open wrap Id : $owAdUnitId" }
                 adRequest = bannerManager.checkOverride()
             }
@@ -570,7 +579,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         bannerManager.shouldSetConfig {
             var adRequest: AdManagerAdRequest? = null
             if (it) {
-                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType)
+                bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType, section)
                 log { "attach hybrid pubmatic with publisher : $pubID, profile : $profile, open wrap Id : $owAdUnitId" }
                 adRequest = bannerManager.checkOverride()
             }

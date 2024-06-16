@@ -80,6 +80,8 @@ internal data class SDKConfig(
         val heldUnits: ArrayList<String>? = null,
         @SerializedName("regional_halts")
         val regionalHalts: ArrayList<Regions>? = null,
+        @SerializedName("section_regional_halts")
+        val sectionRegionalHalt: ArrayList<Regions>? = null,
         @SerializedName("hijack")
         val hijackConfig: LoadConfigs? = null,
         @SerializedName("unfilled")
@@ -96,11 +98,20 @@ internal data class SDKConfig(
 
     @Keep
     data class Regions(
+            @SerializedName("cities")
             private val cities: String? = null,
+            @SerializedName("states")
             private val states: String? = null,
+            @SerializedName("countries")
             private val countries: String? = null,
+            @SerializedName("mode")
             val mode: String? = null,
-            val units: ArrayList<String>? = null
+            @SerializedName("units")
+            val units: ArrayList<String>? = null,
+            @SerializedName("sections")
+            val sections: ArrayList<String>? = null,
+            @SerializedName("percentage")
+            val percentage: Int? = null,
     ) {
         fun getCities(): List<String> {
             return cities?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
@@ -398,7 +409,9 @@ internal data class SDKConfig(
             @SerializedName("number")
             val number: Int? = null,
             @SerializedName("region_wise")
-            val regionWise: Int? = null
+            val regionWise: Int? = null,
+            @SerializedName("region_wise_per")
+            val regionalPercentage: List<Regions>? = null
     )
 
     @Keep

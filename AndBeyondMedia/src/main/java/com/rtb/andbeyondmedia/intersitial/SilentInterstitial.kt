@@ -18,6 +18,7 @@ import com.rtb.andbeyondmedia.R
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
+import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
@@ -113,7 +114,9 @@ internal class SilentInterstitial {
     private fun loadAd() {
         val lastInterShown = storeService?.lastInterstitial ?: 0L
         if (Date().time - lastInterShown >= (interstitialConfig.loadFrequency ?: 0) * 1000) {
-            if (interstitialConfig.custom == 1) {
+            if (interstitialConfig.rewarded == 1) {
+                loadRewarded()
+            } else if (interstitialConfig.custom == 1) {
                 loadCustomInterstitial()
             } else {
                 loadInterstitial()
@@ -124,8 +127,27 @@ internal class SilentInterstitial {
         }
     }
 
+    private fun loadRewarded() = findContext()?.let { activity ->
+        tag.log { "Loading rewarded interstitial with unit ${interstitialConfig.adunit}" }
+        val rewardedInterstitialAd = RewardedInterstitialAd(activity, interstitialConfig.adunit ?: "")
+        rewardedInterstitialAd.load(AdRequest().Builder().build()) { loaded ->
+            if (loaded) {
+                tag.log { "Rewarded interstitial ad has loaded and it should show now" }
+                storeService?.lastInterstitial = Date().time
+                rewardedInterstitialAd.show {}
+                resumeCounter()
+            } else {
+                tag.log { "Rewarded interstitial ad has failed and trying custom now" }
+                loadCustomInterstitial()
+            }
+        }
+    } ?: kotlin.run {
+        tag.log { "Foreground context is not present for GAM  Rewarded Load" }
+        resumeCounter()
+    }
+
     private fun loadInterstitial() = findContext()?.let { activity ->
-        tag.log { "Loading interstital with unit ${interstitialConfig.adunit}" }
+        tag.log { "Loading interstitial with unit ${interstitialConfig.adunit}" }
         val interstitialAd = InterstitialAd(activity, interstitialConfig.adunit ?: "")
         interstitialAd.load(AdRequest().Builder().build()) { loaded ->
             if (loaded) {

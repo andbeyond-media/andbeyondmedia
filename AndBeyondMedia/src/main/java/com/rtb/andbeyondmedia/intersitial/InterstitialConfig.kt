@@ -37,6 +37,8 @@ internal data class SilentInterstitialConfig(
         val adunit: String? = null,
         @SerializedName("custom")
         val custom: Int? = null,
+        @SerializedName("rewarded")
+        val rewarded: Int? = null,
         @SerializedName("timer")
         val timer: Int? = null,
         @SerializedName("close_delay")
