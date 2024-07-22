@@ -47,7 +47,7 @@ fun getUniqueId(): String {
 }
 
 @SuppressLint("HardwareIds")
-fun Context.getDeviceId() = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+fun Context.getHardwareDeviceId() = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
 
 @SuppressLint("MissingPermission")
 fun Context.getLocation() = try {

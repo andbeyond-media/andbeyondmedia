@@ -32,7 +32,7 @@ import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.common.connectionAvailable
 import com.rtb.andbeyondmedia.common.getAddress
 import com.rtb.andbeyondmedia.common.getCountry
-import com.rtb.andbeyondmedia.common.getDeviceId
+import com.rtb.andbeyondmedia.common.getHardwareDeviceId
 import com.rtb.andbeyondmedia.common.getLocation
 import com.rtb.andbeyondmedia.common.getUniqueId
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
@@ -1177,7 +1177,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                 .replace("{sdkver}", MobileAds.getVersion().toString())
                 .replace("{os}", "Android")
                 .replace("{osv}", Build.VERSION.RELEASE)
-                .replace("{ifa}", context.getDeviceId())
+                .replace("{ifa}", context.getHardwareDeviceId())
                 .replace("{make}", Build.MANUFACTURER)
                 .replace("{model}", Build.MODEL)
                 .replace("{ua}", WebView(context).settings.userAgentString)
