@@ -31,3 +31,4 @@
 -keep public class com.google.android.gms.ads.** {
     public *;
 }
+-dontwarn java.lang.invoke.StringConcatFactory
