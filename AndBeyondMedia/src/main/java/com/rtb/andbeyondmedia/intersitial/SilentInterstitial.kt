@@ -7,6 +7,7 @@ import android.view.View
 import android.view.Window
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDialog
 import androidx.lifecycle.Lifecycle
@@ -169,7 +170,7 @@ internal class SilentInterstitial {
         if (activities.isEmpty()) return null
         return try {
             activities = activities.filter { !it.isDestroyed && !it.isFinishing } as ArrayList<Activity>
-            val current = activities.firstOrNull { (it as? AppCompatActivity)?.lifecycle?.currentState == Lifecycle.State.RESUMED }
+            val current = activities.firstOrNull { ((it as? AppCompatActivity) ?: (it as? ComponentActivity))?.lifecycle?.currentState == Lifecycle.State.RESUMED }
             return if (dialog?.isShowing == true) {
                 null
             } else current

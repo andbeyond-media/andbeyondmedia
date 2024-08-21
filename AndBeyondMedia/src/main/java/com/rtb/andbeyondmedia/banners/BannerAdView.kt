@@ -1,6 +1,7 @@
 package com.rtb.andbeyondmedia.banners
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
@@ -12,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.allViews
 import androidx.lifecycle.Lifecycle
@@ -318,10 +320,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
 
         fun sendFailure(error: String) {
-            log { "Fallback for $currentAdUnit Failed with error : $error" }
-            bannerManager.startUnfilledRefreshCounter()
-            if (bannerManager.allowCallback(isRefreshLoaded)) {
-                bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(10, "No Fill"), false)
+            try {
+                log { "Fallback for $currentAdUnit Failed with error : $error" }
+                bannerManager.startUnfilledRefreshCounter()
+                if (bannerManager.allowCallback(isRefreshLoaded)) {
+                    bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(10, "No Fill"), false)
+                }
+            } catch (_: Throwable) {
             }
         }
 
@@ -767,9 +772,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 lifecycle = context.lifecycle
             }
             if (lifecycle == null) {
-                lifecycle = (mContext as? AppCompatActivity)?.lifecycle
+                lifecycle = ((mContext as? AppCompatActivity) ?: (mContext as? ComponentActivity))?.lifecycle
             }
-            (mContext as? AppCompatActivity)?.let {
+            (mContext as? Activity)?.let {
                 AndBeyondMedia.registerActivity(it)
             }
 

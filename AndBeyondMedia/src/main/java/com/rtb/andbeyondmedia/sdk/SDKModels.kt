@@ -114,15 +114,15 @@ internal data class SDKConfig(
             val percentage: Int? = null,
     ) {
         fun getCities(): List<String> {
-            return cities?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
+            return cities?.split(",")?.filter { it.isNotBlank() }?.map { it.trim() } ?: listOf()
         }
 
         fun getStates(): List<String> {
-            return states?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
+            return states?.split(",")?.filter { it.isNotBlank() }?.map { it.trim() } ?: listOf()
         }
 
         fun getCountries(): List<String> {
-            return countries?.replace(" ", "")?.split(",")?.filter { it.isNotBlank() } ?: listOf()
+            return countries?.split(",")?.filter { it.isNotBlank() }?.map { it.trim() } ?: listOf()
         }
     }
 
