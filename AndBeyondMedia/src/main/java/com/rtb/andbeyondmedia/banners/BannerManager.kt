@@ -40,6 +40,7 @@ import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.CountryDetectionWorker
 import com.rtb.andbeyondmedia.sdk.CountryModel
+import com.rtb.andbeyondmedia.sdk.EventLogger
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
@@ -194,6 +195,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String, section: String) {
         view.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
+        EventLogger.logEvent(view, EventLogger.Events.BANNER_START, pubAdUnit)
         if (!shouldBeActive()) return
         if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it, true) } == true) {
             shouldBeActive = false
@@ -1229,5 +1231,48 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
         return biggestPubSize ?: AdSize.MEDIUM_RECTANGLE
+    }
+
+    fun lazyLoadEnabled(): Boolean {
+        if (sdkConfig == null) return false
+        return shouldBeActive && (sdkConfig?.seemlessRefresh ?: 0) == 1 && (sdkConfig?.safeImpressions?.active ?: 0) == 1
+    }
+
+    fun getPlaceholderFallbackAd(): Fallback.Banner? {
+        val matchedBanners = arrayListOf<Fallback.Banner>()
+        pubAdSizes.forEach { pubSize ->
+            bannerConfig.fallback?.banners?.firstOrNull { (it.width?.toIntOrNull() ?: 0) == pubSize.width && (it.height?.toIntOrNull() ?: 0) == pubSize.height }?.let { matchedSize ->
+                matchedBanners.add(matchedSize)
+            }
+        }
+        var biggestBanner: Fallback.Banner? = null
+        var maxArea = 0
+        matchedBanners.forEach {
+            if (maxArea < ((it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0))) {
+                biggestBanner = it
+                maxArea = (it.width?.toIntOrNull() ?: 0) * (it.height?.toIntOrNull() ?: 0)
+            }
+        }
+
+        if (biggestBanner == null) {
+            var biggestPubSize: AdSize? = null
+            maxArea = 0
+            pubAdSizes.forEach {
+                if (maxArea < (it.width * it.height)) {
+                    biggestPubSize = it
+                    maxArea = (it.width * it.height)
+                }
+            }
+            biggestBanner = bannerConfig.fallback?.banners?.firstOrNull { it.height.equals("all", true) && it.width.equals("all", true) }?.apply {
+                height = biggestPubSize?.height.toString()
+                width = biggestPubSize?.width.toString()
+            }
+        }
+
+        return biggestBanner
+    }
+
+    fun getTimerForUnlockingForceImpression(): Int {
+        return sdkConfig?.safeImpressions?.unlockForceImpression ?: 0
     }
 }

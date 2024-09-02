@@ -29,6 +29,7 @@ import com.google.gson.GsonBuilder
 import com.pubmatic.sdk.common.OpenWrapSDK
 import com.pubmatic.sdk.common.models.POBApplicationInfo
 import com.rtb.andbeyondmedia.BuildConfig
+import com.rtb.andbeyondmedia.banners.SavedBannerLoader
 import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitial
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
@@ -330,6 +331,8 @@ internal object SDKManager {
         val storeService = AndBeyondMedia.getStoreService(context)
         val config = storeService.config ?: return
         if (config.switch != 1) return
+        SavedBannerLoader.setConfig(config.safeImpressions)
+        EventLogger.setConfig(config.safeImpressions, config.affiliatedId.toString())
         initializePrebid(context, config.prebid)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
         initializeAPS(context, config.aps)

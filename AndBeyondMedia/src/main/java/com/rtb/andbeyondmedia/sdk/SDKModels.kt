@@ -52,6 +52,8 @@ internal data class SDKConfig(
         val seemlessRefresh: Int? = null,
         @SerializedName("seemless_refresh_fallback")
         val seemlessRefreshFallback: Int? = null,
+        @SerializedName("safe_impressions")
+        val safeImpressions: SafeImpressionConfig? = null,
         @SerializedName("instant_refresh")
         val instantRefresh: Int? = null,
         @SerializedName("active")
@@ -492,7 +494,7 @@ data class Fallback(
 
 
 @Keep
-data class CountryModel(
+internal data class CountryModel(
         @SerializedName("countryCode", alternate = ["country"])
         val countryCode: String? = null,
         @SerializedName("latitude", alternate = ["lat"])
@@ -507,4 +509,20 @@ data class CountryModel(
         val zip: String? = null,
         @SerializedName("ip")
         val ip: String? = null
+)
+
+@Keep
+internal data class SafeImpressionConfig(
+        @SerializedName("active")
+        val active: Int? = null,
+        @SerializedName("ttl")
+        val ttl: Int? = null,
+        @SerializedName("dnt")
+        val dnt: Int? = null,
+        @SerializedName("unlock_force_impression")
+        val unlockForceImpression: Int? = null,
+        @SerializedName("event_logging")
+        val eventLogging: Int? = null,
+        @SerializedName("event_log_url")
+        val eventLogUrl: String? = null
 )

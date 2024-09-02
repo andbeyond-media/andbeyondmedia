@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
+import android.view.View
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -15,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.allViews
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,6 +58,7 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
+import com.rtb.andbeyondmedia.sdk.EventLogger
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -86,6 +91,9 @@ class BannerAdView : LinearLayout, BannerManagerListener {
     private var owTestMode: Boolean? = null
     private var pendingAttach: Boolean = false
     private var adEverLoaded: Boolean = false
+    private var savedBannerId: Int = 0
+    private var viewVisibility: Boolean? = null
+    private var missedAttachChance = false
 
     constructor(context: Context) : super(context) {
         init(context, null)
@@ -197,16 +205,81 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
-    private fun attachView() {
-        try {
-            loadedAdView?.destroy()
-            loadedOWView?.destroy()
-            binding.root.removeAllViews()
-            binding.root.addView(adView)
-        } catch (_: Throwable) {
+    private fun attachView(ignoreVisibility: Boolean = false) {
+
+        fun attach() {
+            try {
+                loadedAdView?.destroy()
+                loadedOWView?.destroy()
+                binding.root.removeAllViews()
+                binding.root.addView(adView)
+            } catch (_: Throwable) {
+            }
+            pendingAttach = false
+            log { "attachAdView : $currentAdUnit" }
         }
-        pendingAttach = false
-        log { "attachAdView : $currentAdUnit" }
+
+        if (bannerManager.lazyLoadEnabled()) {
+            if (ignoreVisibility || viewVisibility == null || viewVisibility == true) {
+                SavedBannerLoader.removeAd(savedBannerId)
+                savedBannerId = 0
+                missedAttachChance = false
+                attach()
+            } else {
+                missedAttachChance = true
+                val unlockForceImpressionTime = bannerManager.getTimerForUnlockingForceImpression()
+                log { "Should attach placeholder fallback here with unlocking force impression time :$unlockForceImpressionTime" }
+                if (unlockForceImpressionTime != 0) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        bannerManager.pendingImpression = false
+                    }, (unlockForceImpressionTime * 1000).toLong())
+                }
+                bannerManager.getPlaceholderFallbackAd()?.let {
+                    attachPlaceholderFallback(it)
+                } ?: attachPlaceholderEmptyAd()
+            }
+        } else {
+            attach()
+        }
+    }
+
+    private fun attachPlaceholderEmptyAd() {
+        binding.root.removeAllViews()
+        val size = bannerManager.getBiggestSize()
+        val view = View(context).apply {
+            layoutParams = LayoutParams(context.dpToPx(size.width), context.dpToPx(size.height))
+            setBackgroundColor(ContextCompat.getColor(context, android.R.color.white))
+        }
+        binding.root.addView(view)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun attachPlaceholderFallback(fallbackBanner: Fallback.Banner) {
+        binding.root.removeAllViews()
+        if (fallbackBanner.type == null || fallbackBanner.type.equals("image", true)) {
+            val imageView = ImageView(context).apply {
+                layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+                scaleType = ImageView.ScaleType.FIT_XY
+            }
+            binding.root.addView(imageView)
+            try {
+                log { "Attach placeholder fallback image for : $currentAdUnit" }
+                Glide.with(context.applicationContext).load(fallbackBanner.image).into(imageView)
+            } catch (_: Throwable) {
+            }
+        } else {
+            val scriptWebView = WebView(context).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                layoutParams = LayoutParams(context.dpToPx(fallbackBanner.width?.toIntOrNull() ?: 0), context.dpToPx(fallbackBanner.height?.toIntOrNull() ?: 0))
+            }
+            binding.root.addView(scriptWebView)
+            try {
+                log { "Attach placeholder fallback web for : $currentAdUnit" }
+                scriptWebView.loadData(fallbackBanner.script ?: "", "text/html; charset=utf-8", "UTF-8")
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -428,7 +501,14 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${adRequest.customTargeting}" }
                 isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
-                bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
+                bannerManager.fetchDemand(firstLook, adRequest) {
+                    if (adRequest.customTargeting.containsKey("refresh") && bannerManager.lazyLoadEnabled()) {
+                        savedBannerId = SavedBannerLoader.saveBanner(adView, currentAdSizes)
+                        EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_VIEW_SAVED, currentAdUnit)
+                    }
+                    EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_REQUESTED, currentAdUnit)
+                    adView.loadAd(it)
+                }
             }
         }
         if (firstLook) {
@@ -646,6 +726,17 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
+        viewVisibility = isVisible
+        if (missedAttachChance && isVisible) {
+            val ownAd = SavedBannerLoader.getOwnAd(savedBannerId)
+            if (ownAd != null) {
+                EventLogger.logEvent(this, EventLogger.Events.OWN_AD_USED, currentAdUnit)
+                adView = ownAd
+                attachView(true)
+            } else {
+                bannerManager.pendingImpression = false
+            }
+        }
         bannerManager.saveVisibility(isVisible)
     }
 
@@ -674,9 +765,20 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
             log { "Adunit $currentAdUnit Failed with error : $p0" }
+            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_FAILED, currentAdUnit)
             val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
+            }
+            SavedBannerLoader.removeAd(savedBannerId)
+            val savedBanner = SavedBannerLoader.getLoadedBanner(currentAdSizes)
+            savedBanner?.let {
+                it.adListener = this
+                adView = it
+                log { "Using banner from pool for Adunit $currentAdUnit" }
+                EventLogger.logEvent(this@BannerAdView, EventLogger.Events.SAVED_AD_USED, currentAdUnit)
+                onAdLoaded()
+                return
             }
             var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
@@ -712,6 +814,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdImpression() {
             super.onAdImpression()
+            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_IMPRESSION, currentAdUnit)
             adEverLoaded = true
             adView.tag = "loaded"
             bannerManager.adImpressed()
@@ -728,6 +831,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdLoaded()
             bannerManager.pendingImpression = true
             log { "Ad loaded with unit : $currentAdUnit" }
+            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_LOADED, currentAdUnit)
             if (bannerManager.isSeemLessRefreshActive()) {
                 if (pendingAttach) {
                     attachView()
