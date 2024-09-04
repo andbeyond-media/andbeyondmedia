@@ -1,7 +1,9 @@
 package com.rtb.andbeyondmedia.sdk
 
+import android.content.Context
 import android.view.View
 import com.google.gson.Gson
+import com.rtb.andbeyondmedia.common.getHardwareDeviceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,16 +54,17 @@ internal object EventLogger {
         return SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ENGLISH).format(Date())
     }
 
-    fun logEvent(view: View?, eventName: String, adUnit: String, params: Map<String, Any> = hashMapOf()) {
+    fun logEvent(view: View?, context: Context, eventName: String, adUnit: String, params: Map<String, Any> = hashMapOf()) {
         try {
             val data = hashMapOf(
                     "aff" to (affId ?: ""),
-                    "adunit" to adUnit,
+                    "adunit" to adUnit.substringAfterLast("/"),
                     "eventname" to eventName,
                     "timestamp" to getCurrentTime(),
             )
             params.forEach { data[it.key] = it.value.toString() }
-            data["param4"] = view?.id.toString()
+            data["param3"] = view?.id.toString()
+            data["param4"] = context.getHardwareDeviceId()
             val body = hashMapOf("body" to Gson().toJson(data))
             sendEvent(Gson().toJson(body))
         } catch (_: Throwable) {
@@ -69,13 +72,9 @@ internal object EventLogger {
     }
 
     object Events {
-        const val BANNER_START = "BANNER_START"
-        const val AD_REQUESTED = "AD_REQUESTED"
-        const val AD_LOADED = "AD_LOADED"
-        const val AD_FAILED = "AD_FAILED"
-        const val AD_IMPRESSION = "AD_IMPRESSION"
-        const val AD_VIEW_SAVED = "AD_VIEW_STORED"
+        const val AD_STORED = "AD_STORED"
+        const val OWN_AD_NOT_FOUND = "OWN_AD_NOT_FOUND"
         const val OWN_AD_USED = "OWN_AD_USED"
-        const val SAVED_AD_USED = "SAVED_AD_USED"
+        const val RESUED_OTHER_AD = "RESUED_OTHER_AD"
     }
 }

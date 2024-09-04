@@ -224,6 +224,10 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 SavedBannerLoader.removeAd(savedBannerId)
                 savedBannerId = 0
                 missedAttachChance = false
+                if (!ignoreVisibility) {
+                    EventLogger.logEvent(this@BannerAdView, mContext, EventLogger.Events.OWN_AD_USED, bannerManager.getPubAdUnit(),
+                            hashMapOf("param2" to "Direct_attach"))
+                }
                 attach()
             } else {
                 missedAttachChance = true
@@ -504,9 +508,8 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 bannerManager.fetchDemand(firstLook, adRequest) {
                     if (adRequest.customTargeting.containsKey("refresh") && bannerManager.lazyLoadEnabled()) {
                         savedBannerId = SavedBannerLoader.saveBanner(adView, currentAdSizes)
-                        EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_VIEW_SAVED, currentAdUnit)
+                        EventLogger.logEvent(this@BannerAdView, mContext, EventLogger.Events.AD_STORED, bannerManager.getPubAdUnit())
                     }
-                    EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_REQUESTED, currentAdUnit)
                     adView.loadAd(it)
                 }
             }
@@ -728,13 +731,17 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         super.onVisibilityAggregated(isVisible)
         viewVisibility = isVisible
         if (missedAttachChance && isVisible) {
-            val ownAd = SavedBannerLoader.getOwnAd(savedBannerId)
-            if (ownAd != null) {
-                EventLogger.logEvent(this, EventLogger.Events.OWN_AD_USED, currentAdUnit)
-                adView = ownAd
+            val ownAdWithTime = SavedBannerLoader.getOwnAd(savedBannerId)
+            if (ownAdWithTime.first != null) {
+                adView = ownAdWithTime.first!!
                 attachView(true)
+                EventLogger.logEvent(this@BannerAdView, mContext, EventLogger.Events.OWN_AD_USED, bannerManager.getPubAdUnit(),
+                        hashMapOf("param1" to ownAdWithTime.second, "param2" to "Visibility_attach"))
             } else {
-                bannerManager.pendingImpression = false
+                if (bannerManager.pendingImpression) {
+                    EventLogger.logEvent(this@BannerAdView, mContext, EventLogger.Events.OWN_AD_NOT_FOUND, bannerManager.getPubAdUnit())
+                    bannerManager.pendingImpression = false
+                }
             }
         }
         bannerManager.saveVisibility(isVisible)
@@ -765,18 +772,18 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         override fun onAdFailedToLoad(p0: LoadAdError) {
             super.onAdFailedToLoad(p0)
             log { "Adunit $currentAdUnit Failed with error : $p0" }
-            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_FAILED, currentAdUnit)
             val tempStatus = firstLook
             if (firstLook) {
                 firstLook = false
             }
             SavedBannerLoader.removeAd(savedBannerId)
-            val savedBanner = SavedBannerLoader.getLoadedBanner(currentAdSizes)
-            savedBanner?.let {
+            val savedBannerWithTime = SavedBannerLoader.getLoadedBanner(currentAdSizes)
+            savedBannerWithTime.first?.let {
                 it.adListener = this
                 adView = it
                 log { "Using banner from pool for Adunit $currentAdUnit" }
-                EventLogger.logEvent(this@BannerAdView, EventLogger.Events.SAVED_AD_USED, currentAdUnit)
+                EventLogger.logEvent(this@BannerAdView, mContext, EventLogger.Events.RESUED_OTHER_AD, bannerManager.getPubAdUnit(),
+                        hashMapOf("param1" to savedBannerWithTime.second))
                 onAdLoaded()
                 return
             }
@@ -814,7 +821,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
 
         override fun onAdImpression() {
             super.onAdImpression()
-            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_IMPRESSION, currentAdUnit)
             adEverLoaded = true
             adView.tag = "loaded"
             bannerManager.adImpressed()
@@ -831,7 +837,6 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             super.onAdLoaded()
             bannerManager.pendingImpression = true
             log { "Ad loaded with unit : $currentAdUnit" }
-            EventLogger.logEvent(this@BannerAdView, EventLogger.Events.AD_LOADED, currentAdUnit)
             if (bannerManager.isSeemLessRefreshActive()) {
                 if (pendingAttach) {
                     attachView()

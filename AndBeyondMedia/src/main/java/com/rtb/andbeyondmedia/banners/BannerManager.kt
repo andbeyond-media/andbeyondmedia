@@ -40,7 +40,6 @@ import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
 import com.rtb.andbeyondmedia.sdk.CountryDetectionWorker
 import com.rtb.andbeyondmedia.sdk.CountryModel
-import com.rtb.andbeyondmedia.sdk.EventLogger
 import com.rtb.andbeyondmedia.sdk.Fallback
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
@@ -195,7 +194,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String, section: String) {
         view.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
-        EventLogger.logEvent(view, EventLogger.Events.BANNER_START, pubAdUnit)
         if (!shouldBeActive()) return
         if (sdkConfig?.getBlockList()?.any { pubAdUnit.contains(it, true) } == true) {
             shouldBeActive = false
@@ -637,7 +635,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                               hijacked: Boolean = false,
                               instant: Boolean = false,
                               newUnit: Boolean = false) = AdRequest().Builder().apply {
-        addCustomTargeting("adunit", bannerConfig.publisherAdUnit)
+        addCustomTargeting("adunit", bannerConfig.publisherAdUnit.substringAfterLast("/"))
         addCustomTargeting("active", active.toString())
         addCustomTargeting("refresh", bannerConfig.refreshCount.toString())
         addCustomTargeting("hb_format", sdkConfig?.hbFormat ?: "amp")
@@ -1235,7 +1233,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun lazyLoadEnabled(): Boolean {
         if (sdkConfig == null) return false
-        return shouldBeActive && (sdkConfig?.seemlessRefresh ?: 0) == 1 && (sdkConfig?.safeImpressions?.active ?: 0) == 1
+        return shouldBeActive && (sdkConfig?.seemlessRefresh ?: 0) == 1 && SavedBannerLoader.isActive
     }
 
     fun getPlaceholderFallbackAd(): Fallback.Banner? {
@@ -1274,5 +1272,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
 
     fun getTimerForUnlockingForceImpression(): Int {
         return sdkConfig?.safeImpressions?.unlockForceImpression ?: 0
+    }
+
+    fun getPubAdUnit(): String {
+        return bannerConfig.publisherAdUnit
     }
 }
