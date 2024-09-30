@@ -24,7 +24,6 @@ import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
-import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +34,7 @@ import org.prebid.mobile.NativeDataAsset
 import org.prebid.mobile.NativeEventTracker
 import org.prebid.mobile.NativeImageAsset
 import org.prebid.mobile.NativeTitleAsset
+import java.util.Locale
 
 class NativeAdManager(private val context: Context, private val adUnit: String) {
 
@@ -255,8 +255,10 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     }
 
     private fun adFailedToLoad(firstLook: Boolean, callBack: (nativeAd: NativeAd?) -> Unit, adError: LoadAdError) {
-        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)} " +
-                "&& isFirstLook : $firstLook" }
+        adUnit.log {
+            "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)} " +
+                    "&& isFirstLook : $firstLook"
+        }
         fun requestAd() {
             nativeConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
@@ -342,14 +344,15 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
             retryConfig = sdkConfig?.retryConfig
-            hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
-            unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
+            hijack = sdkConfig?.hijackConfig?.native ?: sdkConfig?.hijackConfig?.other
+            unFilled = sdkConfig?.unfilledConfig?.native ?: sdkConfig?.unfilledConfig?.other
         }
         adUnit.log { "setConfig :$nativeConfig" }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", nativeConfig.customUnitName, if (unfilled) nativeConfig.unFilled?.number else if (newUnit) nativeConfig.newUnit?.number else if (hijacked) nativeConfig.hijack?.number else nativeConfig.position)
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", nativeConfig.customUnitName,
+                if (unfilled) nativeConfig.unFilled?.number else if (newUnit) nativeConfig.newUnit?.number else if (hijacked) nativeConfig.hijack?.number else nativeConfig.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
