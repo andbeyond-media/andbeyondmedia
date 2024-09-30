@@ -808,7 +808,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
                 if (!retryStatus) {
                     bannerManager.startUnfilledRefreshCounter()
                 }
-                if (bannerManager.allowCallback(isRefreshLoaded)) {
+                if (bannerManager.allowCallback(isRefreshLoaded) && !retryStatus) {
                     bannerAdListener?.onAdFailedToLoad(this@BannerAdView, ABMError(p0.code, p0.message, p0.domain), retryStatus)
                 }
             } else {
