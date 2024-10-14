@@ -7,6 +7,7 @@ import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
+import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.nativead.NativeAd
@@ -19,12 +20,13 @@ import com.pubmatic.sdk.nativead.POBNativeAdLoaderListener
 import com.pubmatic.sdk.nativead.datatype.POBNativeTemplateType
 import com.pubmatic.sdk.openwrap.eventhandler.dfp.GAMNativeEventHandler
 import com.rtb.andbeyondmedia.BuildConfig
+import com.rtb.andbeyondmedia.banners.BannerAdSize
+import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
-import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,7 @@ import org.prebid.mobile.NativeDataAsset
 import org.prebid.mobile.NativeEventTracker
 import org.prebid.mobile.NativeImageAsset
 import org.prebid.mobile.NativeTitleAsset
+import java.util.Locale
 
 class NativeAdManager(private val context: Context, private val adUnit: String) {
 
@@ -95,12 +98,12 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                 if (nativeConfig.isNewUnitApplied()) {
                     adUnit.log { "new unit override on ow adunit : $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
-                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, fallback)
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, fallback, null, null)
                     }
                 } else if (checkHijack(nativeConfig.hijack)) {
                     adUnit.log { "hijack override on ow adunit : $adUnit" }
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
-                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, fallback)
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, fallback, null, null)
                     }
                 } else {
                     loadOW(pubID, profile, owAdUnitId, templateType, eventHandler, fallback, callBack)
@@ -168,19 +171,19 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                     adUnit.log { "new unit override on $adUnit" }
                     createRequest().getAdRequest()?.let { request ->
                         adManagerAdRequest = request
-                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack)
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, callBack, null, null)
                     }
                 } else if (checkHijack(nativeConfig.hijack)) {
                     adUnit.log { "hijack override on $adUnit" }
                     createRequest(hijacked = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
-                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack)
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, callBack, null, null)
                     }
                 } else {
-                    loadAd(adUnit, adManagerAdRequest!!, callBack)
+                    loadAd(adUnit, adManagerAdRequest!!, callBack, null, null)
                 }
             } else {
-                loadAd(adUnit, adManagerAdRequest!!, callBack)
+                loadAd(adUnit, adManagerAdRequest!!, callBack, null, null)
             }
         }
     }
@@ -194,7 +197,38 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         }
     }
 
-    private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (nativeAd: NativeAd?) -> Unit) {
+    fun load(adRequest: AdRequest, vararg adSizes: BannerAdSize, forNative: (nativeAd: NativeAd?) -> Unit, forBanner: (banner: BannerAdView?) -> Unit) {
+        var adManagerAdRequest = adRequest.getAdRequest()
+        if (adManagerAdRequest == null) {
+            forNative(null)
+            forBanner(null)
+            return
+        }
+        shouldSetConfig {
+            if (it) {
+                setConfig()
+                if (nativeConfig.isNewUnitApplied()) {
+                    adUnit.log { "new unit override on $adUnit" }
+                    createRequest().getAdRequest()?.let { request ->
+                        adManagerAdRequest = request
+                        loadAd(getAdUnitName(false, hijacked = false, newUnit = true), request, forNative, convertAdSizes(*adSizes), forBanner)
+                    }
+                } else if (checkHijack(nativeConfig.hijack)) {
+                    adUnit.log { "hijack override on $adUnit" }
+                    createRequest(hijacked = true).getAdRequest()?.let { request ->
+                        adManagerAdRequest = request
+                        loadAd(getAdUnitName(false, hijacked = true, newUnit = false), request, forNative, convertAdSizes(*adSizes), forBanner)
+                    }
+                } else {
+                    loadAd(adUnit, adManagerAdRequest!!, forNative, convertAdSizes(*adSizes), forBanner)
+                }
+            } else {
+                loadAd(adUnit, adManagerAdRequest!!, forNative, convertAdSizes(*adSizes), forBanner)
+            }
+        }
+    }
+
+    private fun loadAd(adUnit: String, adRequest: AdManagerAdRequest, callBack: (nativeAd: NativeAd?) -> Unit, adSizes: List<AdSize>?, forBanner: ((banner: BannerAdView?) -> Unit)?) {
         otherUnit = adUnit != this.adUnit
         this.adUnit.log { "loading $adUnit by Native GAM" }
         fetchDemand(adRequest) {
@@ -236,14 +270,22 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                                 firstLook = false
                             }
                             try {
-                                adFailedToLoad(tempStatus, callBack, adError)
+                                adFailedToLoad(tempStatus, callBack, adError, adSizes, forBanner)
                             } catch (e: Throwable) {
                                 e.printStackTrace()
                                 callBack(null)
                                 adListener?.onAdFailedToLoad(adError)
                             }
                         }
-                    })
+                    }).apply {
+                        if (adSizes != null) {
+                            this.forAdManagerAdView({
+                                val bannerAd = BannerAdView(context)
+                                bannerAd.setAdView(it, adSizes, adUnit)
+                                forBanner?.invoke(bannerAd)
+                            }, *adSizes.toTypedArray())
+                        }
+                    }
                     .withNativeAdOptions(adOptions)
                     .build()
             if (loadCount == 0) {
@@ -254,13 +296,15 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         }
     }
 
-    private fun adFailedToLoad(firstLook: Boolean, callBack: (nativeAd: NativeAd?) -> Unit, adError: LoadAdError) {
-        adUnit.log { "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)} " +
-                "&& isFirstLook : $firstLook" }
+    private fun adFailedToLoad(firstLook: Boolean, callBack: (nativeAd: NativeAd?) -> Unit, adError: LoadAdError, adSizes: List<AdSize>?, forBanner: ((banner: BannerAdView?) -> Unit)?) {
+        adUnit.log {
+            "Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)} " +
+                    "&& isFirstLook : $firstLook"
+        }
         fun requestAd() {
             nativeConfig.isNewUnit = false
             createRequest(unfilled = true).getAdRequest()?.let {
-                loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack)
+                loadAd(getAdUnitName(unfilled = true, hijacked = false, newUnit = false), it, callBack, adSizes, forBanner)
             }
         }
         if (shouldBeActive) {
@@ -342,14 +386,14 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
             placement = validConfig.placement
             newUnit = sdkConfig?.hijackConfig?.newUnit
             retryConfig = sdkConfig?.retryConfig
-            hijack = sdkConfig?.hijackConfig?.inter ?: sdkConfig?.hijackConfig?.other
-            unFilled = sdkConfig?.unfilledConfig?.inter ?: sdkConfig?.unfilledConfig?.other
+            hijack = sdkConfig?.hijackConfig?.native ?: sdkConfig?.hijackConfig?.other
+            unFilled = sdkConfig?.unfilledConfig?.native ?: sdkConfig?.unfilledConfig?.other
         }
         adUnit.log { "setConfig :$nativeConfig" }
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", nativeConfig.customUnitName, if (unfilled) nativeConfig.unFilled?.number else if (newUnit) nativeConfig.newUnit?.number else if (hijacked) nativeConfig.hijack?.number else nativeConfig.position)
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", nativeConfig.customUnitName, if (unfilled) nativeConfig.unFilled?.number else if (newUnit) nativeConfig.newUnit?.number else if (hijacked) nativeConfig.hijack?.number else nativeConfig.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {
@@ -359,6 +403,13 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
         if (hijacked) addCustomTargeting("hijack", "1")
     }.build()
 
+    fun convertAdSizes(vararg adSizes: BannerAdSize): ArrayList<AdSize> {
+        val adSizeList = arrayListOf<AdSize>()
+        adSizes.toList().forEach {
+            adSizeList.add(it.adSize)
+        }
+        return adSizeList
+    }
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
         if (sdkConfig?.prebid?.whitelistedFormats != null && sdkConfig?.prebid?.whitelistedFormats?.contains(AdTypes.NATIVE) == false) {

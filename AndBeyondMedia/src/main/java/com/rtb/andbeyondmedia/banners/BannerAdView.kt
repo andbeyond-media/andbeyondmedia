@@ -391,6 +391,13 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
+    fun setAdView(adView: AdManagerAdView, adSizes: List<AdSize>, adUnitId: String) {
+        this.adView = adView
+        this.currentAdSizes = adSizes
+        this.currentAdUnit = adUnitId
+        this.adView.adListener = adListener
+    }
+
     fun setSection(section: String) {
         this.section = section
         if (this::currentAdSizes.isInitialized && this::currentAdUnit.isInitialized) {
