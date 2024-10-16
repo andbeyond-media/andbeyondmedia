@@ -7,6 +7,7 @@ import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.nativead.NativeAd
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
@@ -17,6 +18,8 @@ import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
+import com.rtb.andbeyondmedia.unified.UnifiedAdListener
+import com.rtb.andbeyondmedia.unified.UnifiedAdManager
 import com.rtb.andbeyondtest.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity(), BannerAdListener {
@@ -30,12 +33,13 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
-        loadAd()
+        //loadAd()
         //loadInterstitial()
         //loadInterstitialRewarded()
         //loadRewarded()
         //loadAdaptiveAd()
         //loadNative()
+        loadUnifiedAd()
     }
 
     private fun init() {
@@ -51,6 +55,33 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
 
             }
         }
+    }
+
+    private fun loadUnifiedAd() {
+        val adLoader = UnifiedAdManager(this, "/6499/example/banner")
+        adLoader.setAdSizes(BannerAdSize.BANNER, BannerAdSize.MEDIUM_RECTANGLE)
+        adLoader.setAdListener(object : UnifiedAdListener() {
+            override fun onNativeLoaded(nativeAd: NativeAd) {
+                super.onNativeLoaded(nativeAd)
+                showNative(nativeAd)
+                Log.d("Sonu", "onNativeLoaded: ")
+            }
+
+            override fun onAdFailedToLoad(adError: ABMError) {
+                Log.d("Sonu", "onAdFailedToLoad: ${adError.message}")
+            }
+
+            override fun onBannerLoaded(bannerAd: BannerAdView) {
+                Log.d("Sonu", "onBannerLoaded: ")
+                binding.root.addView(bannerAd)
+            }
+
+            override fun onAdImpression() {
+                super.onAdImpression()
+                Log.d("Sonu", "onAdImpression: ")
+            }
+        })
+        adLoader.load(AdRequest().Builder().build())
     }
 
     private fun loadAd() {
@@ -72,19 +103,23 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         })
         nativeAdManger.load(AdRequest().Builder().build()) {
             it?.let {
-                binding.title.text = it.headline
-                binding.nativeAd.headlineView = binding.title
-                binding.description.text = it.body
-                binding.nativeAd.bodyView = binding.description
-                binding.icon.setImageURI(it.icon?.uri)
-                binding.icon.setImageDrawable(it.icon?.drawable)
-                binding.mediaView.mediaContent = it.mediaContent
-                binding.mediaView.setImageScaleType(ImageView.ScaleType.CENTER_CROP)
-                binding.nativeAd.iconView = binding.icon
-                binding.nativeAd.mediaView = binding.mediaView
-                binding.nativeAd.setNativeAd(it)
+                showNative(it)
             }
         }
+    }
+
+    private fun showNative(nativeAd: NativeAd) = nativeAd.let {
+        binding.title.text = it.headline
+        binding.nativeAd.headlineView = binding.title
+        binding.description.text = it.body
+        binding.nativeAd.bodyView = binding.description
+        binding.icon.setImageURI(it.icon?.uri)
+        binding.icon.setImageDrawable(it.icon?.drawable)
+        binding.mediaView.mediaContent = it.mediaContent
+        binding.mediaView.setImageScaleType(ImageView.ScaleType.CENTER_CROP)
+        binding.nativeAd.iconView = binding.icon
+        binding.nativeAd.mediaView = binding.mediaView
+        binding.nativeAd.setNativeAd(it)
     }
 
 

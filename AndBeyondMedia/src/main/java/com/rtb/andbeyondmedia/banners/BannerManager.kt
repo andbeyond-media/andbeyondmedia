@@ -192,6 +192,11 @@ internal class BannerManager(private val context: Context, private val bannerLis
         }, 4000)
     }
 
+    fun setSudoConfig(sdkConfig: SDKConfig?) {
+        this.sdkConfig = storeService.config
+        shouldBeActive = !(sdkConfig == null || sdkConfig.switch != 1)
+    }
+
     fun setConfig(pubAdUnit: String, adSizes: ArrayList<AdSize>, adType: String, section: String) {
         view.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         if (!shouldBeActive()) return

@@ -55,6 +55,7 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
 import com.rtb.andbeyondmedia.sdk.Fallback
+import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +63,7 @@ import kotlinx.coroutines.launch
 import org.prebid.mobile.addendum.AdViewUtils
 import org.prebid.mobile.addendum.PbFindSizeError
 import java.util.Locale
+import kotlin.collections.ArrayList
 
 class BannerAdView : LinearLayout, BannerManagerListener {
 
@@ -391,11 +393,16 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         }
     }
 
-    fun setAdView(adView: AdManagerAdView, adSizes: List<AdSize>, adUnitId: String) {
-        this.adView = adView
+    internal fun setAdView(sdkConfig: SDKConfig?, adView: AdManagerAdView, adSizes: List<AdSize>, adUnitId: String): AdListener {
+        bannerManager.setSudoConfig(sdkConfig)
+        bannerManager.setConfig(adUnitId, adSizes as ArrayList<AdSize>, AdTypes.BANNER, section)
+        log { "attaching banner ad from unified" }
         this.currentAdSizes = adSizes
         this.currentAdUnit = adUnitId
-        this.adView.adListener = adListener
+        adView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        this.adView = adView
+        attachView()
+        return adListener
     }
 
     fun setSection(section: String) {
@@ -434,7 +441,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
         fun load() {
             if (this::adView.isInitialized) {
                 log { "loadAd&load : ${adRequest.customTargeting}" }
-                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1"
+                isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1" && adRequest.customTargeting.getString("new_unit") != "1"
                 bannerManager.fetchDemand(firstLook, adRequest) { adView.loadAd(it) }
             }
         }
