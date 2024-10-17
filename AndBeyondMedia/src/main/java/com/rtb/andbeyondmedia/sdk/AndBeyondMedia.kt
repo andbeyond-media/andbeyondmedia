@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import androidx.work.Constraints
+import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -13,7 +14,6 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
@@ -74,16 +74,16 @@ object AndBeyondMedia {
         fetchConfig(context)
     }
 
+    @Synchronized
     internal fun getStoreService(context: Context): StoreService {
-        @Synchronized
         if (storeService == null) {
             storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE))
         }
         return storeService as StoreService
     }
 
+    @Synchronized
     internal fun getConfigService(): ConfigService {
-        @Synchronized
         if (configService == null) {
             val client = OkHttpClient.Builder()
                     .connectTimeout(3, TimeUnit.SECONDS)
@@ -95,8 +95,8 @@ object AndBeyondMedia {
         return configService as ConfigService
     }
 
+    @Synchronized
     internal fun getCountryService(baseUrl: String): CountryService {
-        @Synchronized
         if (countryService == null) {
             val client = OkHttpClient.Builder()
                     .connectTimeout(3, TimeUnit.SECONDS)
@@ -108,8 +108,8 @@ object AndBeyondMedia {
         return countryService as CountryService
     }
 
+    @Synchronized
     internal fun getWorkManager(context: Context): WorkManager {
-        @Synchronized
         if (workManager == null) {
             workManager = WorkManager.getInstance(context)
         }
@@ -261,8 +261,8 @@ internal object EventHelper {
     }
 }
 
-internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : Worker(context, params) {
-    override fun doWork(): Result {
+internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
         val storeService = AndBeyondMedia.getStoreService(context)
         return try {
             val configService = AndBeyondMedia.getConfigService()
@@ -284,8 +284,8 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
     }
 }
 
-internal class CountryDetectionWorker(private val context: Context, params: WorkerParameters) : Worker(context, params) {
-    override fun doWork(): Result {
+internal class CountryDetectionWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
         val storeService = AndBeyondMedia.getStoreService(context)
         return try {
             var baseUrl = inputData.getString("URL")

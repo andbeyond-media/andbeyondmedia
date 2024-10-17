@@ -11,6 +11,7 @@ import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
+import com.google.gson.Gson
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
@@ -21,6 +22,7 @@ import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,7 @@ import java.util.Locale
 
 class UnifiedAdManager(private val context: Context, private val adUnit: String) {
     private var sdkConfig: SDKConfig? = null
+    private var countryConfig: CountryModel? = null
     private var nativeConfig: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
     private val storeService = AndBeyondMedia.getStoreService(context)
@@ -45,6 +48,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     private var otherUnit = false
     private lateinit var adLoader: AdLoader
     private var currentAdSizes: List<BannerAdSize> = arrayListOf()
+    private var customAdFormatIds: List<String> = arrayListOf()
 
     init {
         sdkConfig = storeService.config
@@ -71,12 +75,19 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
         this.currentAdSizes = adSizes.toList()
     }
 
+    fun setCustomFormatIds(customAdFormatIds: List<String>) {
+        this.customAdFormatIds = customAdFormatIds
+    }
+
     fun load(adRequest: AdRequest) {
         var adManagerAdRequest = adRequest.getAdRequest() ?: return
         shouldSetConfig {
             if (it) {
                 setConfig()
-                if (nativeConfig.isNewUnitApplied()) {
+                if (checkUnifiedBannerOverride()) {
+                    adUnit.log { "unified banner override on $adUnit" }
+                    loadFreshBanner(adRequest)
+                } else if (nativeConfig.isNewUnitApplied()) {
                     adUnit.log { "new unit override on $adUnit" }
                     createRequest(newUnit = true).getAdRequest()?.let { request ->
                         adManagerAdRequest = request
@@ -117,6 +128,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
                         }
 
                         override fun onAdImpression() {
+                            adUnit.log { "Unified ad impressed with ad unit: $adUnit" }
                             bannerAdListener?.onAdImpression()
                             adListener?.onAdImpression()
                         }
@@ -134,7 +146,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
                             if (currentAdSizes.isEmpty()) {
                                 adListener?.onAdFailedToLoad(ABMError(p0.code, p0.message, p0.domain))
                             } else {
-                                createFreshBanner()
+                                checkUnfilledConditions(ABMError(p0.code, p0.message, p0.domain))
                             }
                         }
                     }).apply {
@@ -143,6 +155,15 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
                                 sendLoadedBanner(it, adUnit)
                             }, *convertToAdSizes(currentAdSizes).toTypedArray())
                         }
+                        customAdFormatIds.forEach {
+                            this.forCustomFormatAd(it, { ad ->
+                                adUnit.log { "loaded $adUnit by Unified custom with id :$it" }
+                                adListener?.onCustomAdLoaded(it, ad)
+                            }, { ad, s ->
+                                adListener?.onCustomAdClicked(it, ad, s)
+                            })
+                        }
+
                     }
                     .withNativeAdOptions(adOptions)
                     .build()
@@ -162,7 +183,24 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
         adListener?.onBannerLoaded(banner)
     }
 
-    private fun createFreshBanner() {
+    private fun checkUnfilledConditions(abmError: ABMError) {
+        adUnit.log {
+            "Unified native Failed with Unfilled Config: ${Gson().toJson(nativeConfig.unFilled)} && Retry config : ${Gson().toJson(nativeConfig.retryConfig)}"
+        }
+
+        val shouldRunUnfilled = if (shouldBeActive && nativeConfig.unFilled?.status == 1) {
+            !(nativeConfig.unFilled?.regionWise == 1 && (countryConfig == null || isRegionBlocked() || ifUnitOnRegionalHold(adUnit)))
+        } else false
+
+        if (shouldRunUnfilled) {
+            createFreshBannerForUnfilled()
+        } else {
+            adUnit.log { "Condition did not meet to load unfilled banner on unified native failure" }
+            adListener?.onAdFailedToLoad(abmError)
+        }
+    }
+
+    private fun createFreshBannerForUnfilled() {
         val adUnitForBanner = getAdUnitForBanner()
         val banner = BannerAdView(context)
         banner.setAdSizes(*currentAdSizes.toTypedArray())
@@ -188,6 +226,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
             }
 
             override fun onAdLoaded(bannerAdView: BannerAdView) {
+                adUnit.log { "loaded $adUnit by Unified unfilled banner" }
                 adListener?.onBannerLoaded(bannerAdView)
             }
 
@@ -198,6 +237,44 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
         })
         banner.loadAd(createRequest(unfilled = true))
         adUnit.log { "Loading $adUnitForBanner using unified banner" }
+    }
+
+    private fun loadFreshBanner(adRequest: AdRequest) {
+        adUnit.log { "Loading $adUnit using fresh unified banner" }
+        val banner = BannerAdView(context)
+        banner.setAdSizes(*currentAdSizes.toTypedArray())
+        banner.setAdUnitID(adUnit)
+        banner.setAdListener(object : BannerAdListener {
+            override fun onAdClicked(bannerAdView: BannerAdView) {
+                adListener?.onAdClicked()
+            }
+
+            override fun onAdClosed(bannerAdView: BannerAdView) {
+                adListener?.onAdClosed()
+            }
+
+            override fun onAdFailedToLoad(bannerAdView: BannerAdView, error: ABMError, retrying: Boolean) {
+                if (!retrying) {
+                    this@UnifiedAdManager.adUnit.log { "loading $adUnit failed by fresh banner with error : ${error.message}" }
+                    adListener?.onAdFailedToLoad(error)
+                }
+            }
+
+            override fun onAdImpression(bannerAdView: BannerAdView) {
+                adListener?.onAdImpression()
+            }
+
+            override fun onAdLoaded(bannerAdView: BannerAdView) {
+                adUnit.log { "loaded $adUnit by Unified fresh banner" }
+                adListener?.onBannerLoaded(bannerAdView)
+            }
+
+            override fun onAdOpened(bannerAdView: BannerAdView) {
+                adListener?.onAdOpened()
+            }
+
+        })
+        banner.loadAd(adRequest)
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
@@ -247,6 +324,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
             hijack = sdkConfig?.hijackConfig?.native ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.native ?: sdkConfig?.unfilledConfig?.other
         }
+        countryConfig = storeService.detectedCountry
         adUnit.log { "setConfig :$nativeConfig" }
     }
 
@@ -296,9 +374,82 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     }.build()
 
     private fun checkHijack(hijackConfig: SDKConfig.LoadConfig?): Boolean {
-        return if (hijackConfig?.status == 1) {
+        if (hijackConfig?.regionWise == 1) {
+            return if (countryConfig == null) {
+                false
+            } else {
+                if (hijackConfig.status == 1) {
+                    if (ifUnitOnRegionalHold(adUnit) || isRegionBlocked()) {
+                        false
+                    } else {
+                        val per = getRegionalHijackPercentage(hijackConfig)
+                        val number = (1..100).random()
+                        number in 1..per
+                    }
+                } else {
+                    false
+                }
+
+            }
+        } else {
+            return if (hijackConfig?.status == 1) {
+                val number = (1..100).random()
+                number in 1..(hijackConfig.per ?: 0)
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun getRegionalHijackPercentage(hijackConfig: SDKConfig.LoadConfig?): Int {
+        var percentage = 0
+        if (sdkConfig?.countryStatus?.active == 1 && countryConfig != null) {
+            hijackConfig?.regionalPercentage?.firstOrNull { region ->
+                region.getCities().any { it.equals(countryConfig?.city, true) }
+                        || region.getStates().any { it.equals(countryConfig?.state, true) }
+                        || region.getCountries().any { it.equals(countryConfig?.countryCode, true) }
+                        || region.getCountries().any { it.equals("default", true) }
+            }?.let {
+                percentage = it.percentage ?: 0
+            }
+        }
+        return percentage
+    }
+
+    private fun ifUnitOnRegionalHold(adUnit: String): Boolean {
+        var hold = false
+        if (sdkConfig?.countryStatus?.active == 1 && countryConfig != null) {
+            sdkConfig?.regionalHalts?.forEach { region ->
+                if ((region.getCities().any { it.equals(countryConfig?.city, true) }
+                                || region.getStates().any { it.equals(countryConfig?.state, true) }
+                                || region.getCountries().any { it.equals(countryConfig?.countryCode, true) })
+                        && (region.units?.any { adUnit.contains(it, true) } == true)) {
+                    hold = true
+                }
+            }
+        }
+        if (hold) {
+            adUnit.log { "Regional unified blocking on unit : $adUnit" }
+        }
+        return hold
+    }
+
+    private fun isRegionBlocked(): Boolean {
+        var isRegionBlocked = false
+        if (sdkConfig?.countryStatus?.active == 1 && countryConfig != null &&
+                (sdkConfig?.blockedRegions?.getCities()?.any { it.equals(countryConfig?.city, true) } == true ||
+                        (sdkConfig?.blockedRegions?.getStates()?.any { it.equals(countryConfig?.state, true) } == true) ||
+                        (sdkConfig?.blockedRegions?.getCountries()?.any { it.equals(countryConfig?.countryCode, true) } == true))
+        ) {
+            isRegionBlocked = true
+        }
+        return isRegionBlocked
+    }
+
+    private fun checkUnifiedBannerOverride(): Boolean {
+        return if (currentAdSizes.isNotEmpty()) {
             val number = (1..100).random()
-            number in 1..(hijackConfig.per ?: 100)
+            number in 1..(sdkConfig?.unifiedBanner ?: 0)
         } else {
             false
         }

@@ -70,6 +70,8 @@ internal data class SDKConfig(
         val forceImpression: Int? = null,
         @SerializedName("detect_detach")
         val detectDetach: Int? = null,
+        @SerializedName("unified_banner")
+        val unifiedBanner: Int? = null,
         @SerializedName("config")
         val refreshConfig: List<RefreshConfig>? = null,
         @SerializedName("silent_interstitial_config")

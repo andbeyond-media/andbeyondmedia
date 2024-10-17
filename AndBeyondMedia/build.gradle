@@ -46,7 +46,7 @@ dependencies {
     //noinspection GradleDependency
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.android.gms:play-services-ads:23.2.0"
+    implementation "com.google.android.gms:play-services-ads:23.4.0"
     implementation "com.squareup.okhttp3:okhttp:$okhttp"
     implementation "com.squareup.okhttp3:logging-interceptor:$okhttp"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit"

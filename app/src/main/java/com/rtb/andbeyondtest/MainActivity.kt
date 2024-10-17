@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.gms.ads.nativead.NativeCustomFormatAd
 import com.rtb.andbeyondmedia.banners.BannerAdSize
 import com.rtb.andbeyondmedia.banners.BannerAdView
 import com.rtb.andbeyondmedia.common.AdRequest
@@ -33,13 +34,13 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
         init()
-        //loadAd()
+        loadAd()
         //loadInterstitial()
         //loadInterstitialRewarded()
         //loadRewarded()
         //loadAdaptiveAd()
         //loadNative()
-        loadUnifiedAd()
+        //loadUnifiedAd()
     }
 
     private fun init() {
@@ -60,26 +61,26 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     private fun loadUnifiedAd() {
         val adLoader = UnifiedAdManager(this, "/6499/example/banner")
         adLoader.setAdSizes(BannerAdSize.BANNER, BannerAdSize.MEDIUM_RECTANGLE)
+        adLoader.setCustomFormatIds(arrayListOf("10063170"))
+        adLoader.setLoadCount(1)
         adLoader.setAdListener(object : UnifiedAdListener() {
-            override fun onNativeLoaded(nativeAd: NativeAd) {
-                super.onNativeLoaded(nativeAd)
-                showNative(nativeAd)
-                Log.d("Sonu", "onNativeLoaded: ")
-            }
-
-            override fun onAdFailedToLoad(adError: ABMError) {
-                Log.d("Sonu", "onAdFailedToLoad: ${adError.message}")
-            }
 
             override fun onBannerLoaded(bannerAd: BannerAdView) {
-                Log.d("Sonu", "onBannerLoaded: ")
                 binding.root.addView(bannerAd)
             }
 
-            override fun onAdImpression() {
-                super.onAdImpression()
-                Log.d("Sonu", "onAdImpression: ")
+            override fun onNativeLoaded(nativeAd: NativeAd) {
+                super.onNativeLoaded(nativeAd)
+                showNative(nativeAd)
             }
+
+            override fun onCustomAdLoaded(id: String, customAd: NativeCustomFormatAd) {
+                //show custom ad
+            }
+
+            override fun onAdFailedToLoad(adError: ABMError) {
+            }
+
         })
         adLoader.load(AdRequest().Builder().build())
     }
