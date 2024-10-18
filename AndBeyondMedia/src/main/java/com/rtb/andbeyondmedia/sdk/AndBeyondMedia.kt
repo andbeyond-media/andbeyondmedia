@@ -90,7 +90,7 @@ object AndBeyondMedia {
                 configFile = File(context.applicationContext.filesDir, "config_file")
             }
             if (configCountryFile == null) {
-                configFile = File(context.applicationContext.filesDir, "country_config_file")
+                configCountryFile = File(context.applicationContext.filesDir, "country_config_file")
             }
             configFile?.let {
                 storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE), it, configCountryFile)
