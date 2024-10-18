@@ -3,6 +3,7 @@ package com.rtb.andbeyondmedia.sdk
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
+import java.io.Serializable
 
 @Keep
 internal data class SDKConfig(
@@ -96,7 +97,7 @@ internal data class SDKConfig(
         val fallback: Fallback? = null,
         @SerializedName("native_fallback")
         val nativeFallback: Int? = null
-) {
+) : Serializable {
 
     @Keep
     data class Regions(
@@ -114,7 +115,7 @@ internal data class SDKConfig(
             val sections: ArrayList<String>? = null,
             @SerializedName("percentage")
             val percentage: Int? = null,
-    ) {
+    ) : Serializable {
         fun getCities(): List<String> {
             return cities?.split(",")?.filter { it.isNotBlank() }?.map { it.trim() } ?: listOf()
         }
@@ -131,7 +132,7 @@ internal data class SDKConfig(
     @Keep
     data class OpenWrapConfig(
             val playStoreUrl: String? = null
-    )
+    ) : Serializable
 
     @Keep
     data class TrackingConfig(
@@ -139,7 +140,7 @@ internal data class SDKConfig(
             val percentage: Int? = null,
             @SerializedName("script")
             private val script: String? = null
-    ) {
+    ) : Serializable {
         fun getScript() = if (script.isNullOrEmpty()) {
             null
         } else {
@@ -157,7 +158,7 @@ internal data class SDKConfig(
             val oom: Int? = null,
             @SerializedName("sentry")
             val sentry: Int? = null
-    )
+    ) : Serializable
 
     @Keep
     fun getBlockList() = arrayListOf<String>().apply {
@@ -174,7 +175,7 @@ internal data class SDKConfig(
             val retryInterval: Int? = null,
             @SerializedName("alternate_units")
             var adUnits: ArrayList<String> = arrayListOf()
-    )
+    ) : Serializable
 
     @Keep
     data class UnfilledConfig(
@@ -182,7 +183,7 @@ internal data class SDKConfig(
             val time: Int? = null,
             @SerializedName("unit")
             val unit: String? = null
-    )
+    ) : Serializable
 
     @Keep
     data class InfoConfig(
@@ -192,7 +193,7 @@ internal data class SDKConfig(
             val specialTag: String? = null,
             @SerializedName("refresh_callbacks")
             val refreshCallbacks: Int? = null
-    )
+    ) : Serializable
 
     @Keep
     data class Prebid(
@@ -230,14 +231,14 @@ internal data class SDKConfig(
             val bannerAPIParameters: List<Int>? = null,
             @SerializedName("whitelisted_formats")
             val whitelistedFormats: List<String>? = null
-    ) {
+    ) : Serializable {
         @Keep
         data class KeyValuePair(
                 @SerializedName("key")
                 val key: String? = null,
                 @SerializedName("value")
                 val value: String? = null
-        )
+        ) : Serializable
     }
 
     data class Aps(
@@ -265,7 +266,7 @@ internal data class SDKConfig(
             val omidPartnerVersion: String? = null,
             @SerializedName("mraid_supported_versions")
             val mRaidSupportedVersions: List<String>? = null
-    ) {
+    ) : Serializable {
         @Keep
         data class Slot(
                 @SerializedName("width")
@@ -274,7 +275,7 @@ internal data class SDKConfig(
                 var height: String? = null,
                 @SerializedName("slot_id")
                 val slotId: String? = null
-        )
+        ) : Serializable
     }
 
     @Keep
@@ -291,7 +292,7 @@ internal data class SDKConfig(
             val reasons: String? = null,
             @SerializedName("whitelist")
             val whitelistedRegions: Regions? = null
-    )
+    ) : Serializable
 
     @Keep
     data class OpenRTBConfig(
@@ -313,14 +314,14 @@ internal data class SDKConfig(
             val headers: List<KeyValuePair>? = null,
             @SerializedName("request")
             val request: String? = null
-    ) {
+    ) : Serializable {
         @Keep
         data class KeyValuePair(
                 @SerializedName("key")
                 val key: String? = null,
                 @SerializedName("value")
                 val value: String? = null
-        )
+        ) : Serializable
     }
 
 
@@ -344,7 +345,7 @@ internal data class SDKConfig(
             val specific: String? = null,
             @SerializedName("expiry")
             val expiry: Int? = null
-    )
+    ) : Serializable
 
     @Keep
     data class Size(
@@ -354,7 +355,7 @@ internal data class SDKConfig(
             val height: String? = null,
             @SerializedName("sizes")
             val sizes: List<Size>? = null
-    ) {
+    ) : Serializable {
         @Keep
         fun toSizes(): String {
             return sizes?.joinToString(",") ?: ""
@@ -372,7 +373,7 @@ internal data class SDKConfig(
             val firstLook: String? = null,
             @SerializedName("other")
             val other: String? = null
-    )
+    ) : Serializable
 
     @Keep
     data class LoadConfigs(
@@ -400,7 +401,7 @@ internal data class SDKConfig(
             val appOpen: LoadConfig? = null,
             @SerializedName("ALL", alternate = ["all"])
             val other: LoadConfig? = null
-    )
+    ) : Serializable
 
     @Keep
     data class LoadConfig(
@@ -414,7 +415,7 @@ internal data class SDKConfig(
             val regionWise: Int? = null,
             @SerializedName("region_wise_per")
             val regionalPercentage: List<Regions>? = null
-    )
+    ) : Serializable
 
     @Keep
     data class CountryStatus(
@@ -422,7 +423,7 @@ internal data class SDKConfig(
             val active: Int? = null,
             @SerializedName("url")
             val url: String? = null
-    )
+    ) : Serializable
 
     @Keep
     data class CountryConfig(
@@ -456,7 +457,7 @@ internal data class SDKConfig(
             val geoEdge: GeoEdge? = null,
             @SerializedName("native_fallback")
             val nativeFallback: Int? = null
-    )
+    ) : Serializable
 }
 
 @Keep
@@ -467,7 +468,7 @@ data class Fallback(
         val other: Int? = null,
         @SerializedName("banners")
         val banners: List<Banner>? = null
-) {
+) : Serializable {
     @Keep
     data class Banner(
             @SerializedName("width")
@@ -484,7 +485,7 @@ data class Fallback(
             val url: String? = null,
             @SerializedName("tag")
             private val tag: String? = null
-    ) {
+    ) : Serializable {
         fun getScriptSource() = if (tag.isNullOrEmpty())
             null
         else
@@ -509,4 +510,4 @@ data class CountryModel(
         val zip: String? = null,
         @SerializedName("ip")
         val ip: String? = null
-)
+) : Serializable

@@ -53,6 +53,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.QueryMap
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import java.net.MalformedURLException
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -66,6 +71,10 @@ object AndBeyondMedia {
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
+    internal var cachedConfig: SDKConfig? = null
+    internal var cachedCountryConfig: CountryModel? = null
+    internal var configFile: File? = null
+    internal var configCountryFile: File? = null
     private var silentInterstitial = SilentInterstitial()
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
@@ -77,7 +86,15 @@ object AndBeyondMedia {
     @Synchronized
     internal fun getStoreService(context: Context): StoreService {
         if (storeService == null) {
-            storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE))
+            if (configFile == null) {
+                configFile = File(context.applicationContext.filesDir, "config_file")
+            }
+            if (configCountryFile == null) {
+                configFile = File(context.applicationContext.filesDir, "country_config_file")
+            }
+            configFile?.let {
+                storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE), it, configCountryFile)
+            }
         }
         return storeService as StoreService
     }
@@ -268,7 +285,8 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
             val configService = AndBeyondMedia.getConfigService()
             val response = configService.getConfig(context.packageName).execute()
             if (response.isSuccessful && response.body() != null) {
-                storeService.config = response.body()
+                AndBeyondMedia.cachedConfig = response.body()
+                storeService.config = AndBeyondMedia.cachedConfig
                 Result.success()
             } else {
                 storeService.config?.let {
@@ -438,35 +456,85 @@ internal interface CountryService {
     fun getConfig(): Call<CountryModel>
 }
 
-internal class StoreService(private val prefs: SharedPreferences) {
+internal class StoreService(private val prefs: SharedPreferences, private val configFile: File, private val configCountryFile: File?) {
 
     var config: SDKConfig?
         get() {
-            val string = prefs.getString("CONFIG", "") ?: ""
-            if (string.isEmpty()) return null
-            return try {
-                GsonBuilder().create().fromJson(string, SDKConfig::class.java)
-            } catch (e: Throwable) {
-                null
+            if (AndBeyondMedia.cachedConfig == null) {
+                AndBeyondMedia.cachedConfig = try {
+                    if (configFile.exists()) {
+                        val ois = ObjectInputStream(FileInputStream(configFile))
+                        ois.readObject() as? SDKConfig
+                    } else {
+                        null
+                    }
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+
+            if (AndBeyondMedia.cachedConfig == null) {
+                AndBeyondMedia.cachedConfig = try {
+                    val string = prefs.getString("CONFIG", "") ?: ""
+                    if (string.isEmpty()) return null
+                    GsonBuilder().create().fromJson(string, SDKConfig::class.java)
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+            return AndBeyondMedia.cachedConfig
+        }
+        set(value) {
+            try {
+                val oos = ObjectOutputStream(FileOutputStream(configFile))
+                oos.writeObject(value)
+                oos.flush()
+                oos.close()
+            } catch (_: Throwable) {
+                prefs.edit().apply {
+                    value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
+                }.apply()
             }
         }
-        set(value) = prefs.edit().apply {
-            value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
-        }.apply()
 
     var detectedCountry: CountryModel?
         get() {
-            val string = prefs.getString("COUNTRY", "") ?: ""
-            if (string.isEmpty()) return null
-            return try {
-                GsonBuilder().create().fromJson(string, CountryModel::class.java)
-            } catch (e: Throwable) {
-                null
+            if (AndBeyondMedia.cachedCountryConfig == null) {
+                AndBeyondMedia.cachedCountryConfig = try {
+                    if (configCountryFile?.exists() == true) {
+                        val ois = ObjectInputStream(FileInputStream(configCountryFile))
+                        ois.readObject() as? CountryModel
+                    } else {
+                        null
+                    }
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+
+            if (AndBeyondMedia.cachedCountryConfig == null) {
+                AndBeyondMedia.cachedCountryConfig = try {
+                    val string = prefs.getString("COUNTRY", "") ?: ""
+                    if (string.isEmpty()) return null
+                    GsonBuilder().create().fromJson(string, CountryModel::class.java)
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+            return AndBeyondMedia.cachedCountryConfig
+        }
+        set(value) {
+            try {
+                val oos = ObjectOutputStream(FileOutputStream(configCountryFile))
+                oos.writeObject(value)
+                oos.flush()
+                oos.close()
+            } catch (_: Throwable) {
+                prefs.edit().apply {
+                    value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
+                }.apply()
             }
         }
-        set(value) = prefs.edit().apply {
-            value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
-        }.apply()
 
     var lastInterstitial: Long
         get() = prefs.getLong("INTER_TIME", 0L)

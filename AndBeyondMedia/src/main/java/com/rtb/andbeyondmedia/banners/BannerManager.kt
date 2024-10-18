@@ -133,10 +133,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
         return adSizeList
     }
 
-    fun clearConfig() {
-        storeService.config = null
-    }
-
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun getCountryConfig() = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)

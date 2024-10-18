@@ -3,6 +3,7 @@ package com.rtb.andbeyondmedia.intersitial
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 import com.rtb.andbeyondmedia.sdk.SDKConfig
+import java.io.Serializable
 
 @Keep
 internal data class InterstitialConfig(
@@ -24,7 +25,7 @@ internal data class InterstitialConfig(
         var placement: SDKConfig.Placement? = null,
         @SerializedName("format")
         var format: String? = null
-) {
+) : Serializable {
         @Keep
         fun isNewUnitApplied() = isNewUnit && newUnit?.status == 1
 }
@@ -49,4 +50,4 @@ internal data class SilentInterstitialConfig(
         val regionConfig: SDKConfig.Regions? = null,
         @SerializedName("sizes")
         val bannerSizes: List<SDKConfig.Size>? = null
-)
+) : Serializable
