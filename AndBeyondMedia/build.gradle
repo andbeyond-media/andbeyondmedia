@@ -13,7 +13,7 @@ android {
         targetSdk 34
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
-        buildConfigField("String", "ADAPTER_VERSION", "\"1.5.7.2\"")
+        buildConfigField("String", "ADAPTER_VERSION", "\"1.5.7.3\"")
     }
 
     buildTypes {
@@ -55,6 +55,8 @@ dependencies {
     implementation 'org.prebid:prebid-mobile-sdk:2.2.3'
     implementation 'com.github.appharbr:appharbr-android-sdk:2.13.3'
     implementation 'com.github.bumptech.glide:glide:4.16.0'
+    //coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     //noinspection GradleDependency
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
     implementation 'io.sentry:sentry-android:7.12.0'
@@ -76,7 +78,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.andbeyond-media'
             artifactId = 'andbeyondmedia'
-            version = '1.5.7.2'
+            version = '1.5.7.3'
 
             afterEvaluate {
                 from components.release

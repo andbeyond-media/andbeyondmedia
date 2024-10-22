@@ -51,8 +51,10 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     private var customAdFormatIds: List<String> = arrayListOf()
 
     init {
-        sdkConfig = storeService.config
-        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        storeService.getConfig {
+            sdkConfig = it
+            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        }
     }
 
     fun setAdListener(adListener: UnifiedAdListener) {
@@ -290,9 +292,11 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            sdkConfig = storeService.config
-                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                            callback(shouldBeActive)
+                            storeService.getConfig {
+                                sdkConfig = it
+                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                                callback(shouldBeActive)
+                            }
                         }
                     }
                 })
@@ -324,7 +328,9 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
             hijack = sdkConfig?.hijackConfig?.native ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.native ?: sdkConfig?.unfilledConfig?.other
         }
-        countryConfig = storeService.detectedCountry
+        storeService.getDetectedCountry {
+            countryConfig = it
+        }
         adUnit.log { "setConfig :$nativeConfig" }
     }
 

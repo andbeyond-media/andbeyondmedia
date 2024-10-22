@@ -52,15 +52,16 @@ internal class SilentInterstitial {
         if (started) return
         tag.log { String.format("%s:%s- Version:%s", "setConfig", "entry", BuildConfig.ADAPTER_VERSION) }
         storeService = AndBeyondMedia.getStoreService(context)
-        val sdkConfig = storeService?.config
-        val shouldBeActive = !(sdkConfig == null || sdkConfig.switch != 1)
-        if (!shouldBeActive) return
-        interstitialConfig = sdkConfig?.silentInterstitialConfig ?: SilentInterstitialConfig()
-        ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifeCycleHandler())
-        started = true
-        timerSeconds = interstitialConfig.timer ?: 0
-        tag.log { "setConfig :$interstitialConfig" }
-        resumeCounter()
+        storeService?.getConfig { sdkConfig ->
+            val shouldBeActive = !(sdkConfig == null || sdkConfig.switch != 1)
+            if (!shouldBeActive) return@getConfig
+            interstitialConfig = sdkConfig?.silentInterstitialConfig ?: SilentInterstitialConfig()
+            ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifeCycleHandler())
+            started = true
+            timerSeconds = interstitialConfig.timer ?: 0
+            tag.log { "setConfig :$interstitialConfig" }
+            resumeCounter()
+        }
     }
 
     fun destroy() {

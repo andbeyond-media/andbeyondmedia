@@ -7,7 +7,6 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.net.ConnectivityManager
-import android.net.NetworkInfo
 import android.os.Build
 import android.provider.Settings
 import android.util.TypedValue
@@ -19,24 +18,29 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.Random
 
-fun Context.connectionAvailable(): Boolean? {
+@Suppress("DEPRECATION")
+internal fun Context.connectionAvailable(): Boolean? {
     return try {
-        val internetAvailable: Boolean
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val wifi: NetworkInfo? = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
-        val network: NetworkInfo? = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE)
-        internetAvailable = wifi != null && wifi.isConnected || network != null && network.isConnected
-        internetAvailable
-    } catch (e: Throwable) {
+        val netInfo = connectivityManager.allNetworkInfo
+        var conStant = "Not Connected"
+        for (ni in netInfo) {
+            if (ni.typeName.equals("WIFI", ignoreCase = true))
+                if (ni.isConnected) conStant = "WIFI"
+            if (ni.typeName.equals("MOBILE", ignoreCase = true))
+                if (ni.isConnected) conStant = "MOBILE DATA"
+        }
+        conStant != "Not Connected"
+    } catch (_: Throwable) {
         null
     }
 }
 
-fun Context.dpToPx(value: Int): Int {
+internal fun Context.dpToPx(value: Int): Int {
     return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics).toInt()
 }
 
-fun getUniqueId(): String {
+internal fun getUniqueId(): String {
     val ALLOWED_CHARACTERS = "0123456789qwertyuiopasdfghjklzxcvbnm-"
     val random = Random()
     val sb = StringBuilder(36)
@@ -47,10 +51,10 @@ fun getUniqueId(): String {
 }
 
 @SuppressLint("HardwareIds")
-fun Context.getHardwareDeviceId() = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+internal fun Context.getHardwareDeviceId() = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
 
 @SuppressLint("MissingPermission")
-fun Context.getLocation() = try {
+internal fun Context.getLocation() = try {
     val locationManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         getSystemService(LocationManager::class.java)
     } else {
@@ -62,7 +66,7 @@ fun Context.getLocation() = try {
 }
 
 @Suppress("DEPRECATION")
-fun Context.getAddress(location: Location, callback: (Address?) -> Unit) {
+internal fun Context.getAddress(location: Location, callback: (Address?) -> Unit) {
     try {
         val geocoder = Geocoder(applicationContext, Locale.getDefault())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -79,7 +83,7 @@ fun Context.getAddress(location: Location, callback: (Address?) -> Unit) {
 }
 
 @Keep
-val countryMaps = HashMap<String, String>().apply {
+internal val countryMaps = HashMap<String, String>().apply {
     put("AF", "AFG")
     put("AL", "ALB")
     put("DZ", "DZA")
@@ -322,7 +326,7 @@ val countryMaps = HashMap<String, String>().apply {
     put("ZW", "ZWE")
 }
 
-fun getCountry(code: String): String {
+internal fun getCountry(code: String): String {
     return if (code.isBlank()) ""
     else countryMaps[code.uppercase()] ?: ""
 }

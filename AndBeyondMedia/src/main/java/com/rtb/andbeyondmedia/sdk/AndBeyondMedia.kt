@@ -41,7 +41,9 @@ import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
@@ -152,21 +154,22 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
-                    val config = storeService.config
-                    specialTag = config?.infoConfig?.specialTag
-                    logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
-                    if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
-                        fetchCountry(context, config.countryStatus.url)
-                    }
-                    attachSentry(context)
-                    SDKManager.initialize(context)
-                    if (config?.refetch != null) {
-                        fetchConfig(context, storeService.config?.refetch)
+                    storeService.getConfig { config ->
+                        specialTag = config?.infoConfig?.specialTag
+                        logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
+                        if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
+                            fetchCountry(context, config.countryStatus.url)
+                        }
+                        attachSentry(context, config?.events)
+                        SDKManager.initialize(context, config)
+                        if (config?.refetch != null) {
+                            fetchConfig(context, config.refetch)
+                        }
                     }
                 }
             }
-        } catch (e: Throwable) {
-            SDKManager.initialize(context)
+        } catch (_: Throwable) {
+            SDKManager.initialize(context, null)
         }
     }
 
@@ -182,9 +185,11 @@ object AndBeyondMedia {
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
             workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
                 if (it?.state == WorkInfo.State.SUCCEEDED) {
-                    val config = storeService.config
-                    val countryConfig = storeService.detectedCountry
-                    checkForSilentInterstitial(context, config?.silentInterstitialConfig, countryConfig)
+                    storeService.getConfig { config ->
+                        storeService.getDetectedCountry { countryConfig ->
+                            checkForSilentInterstitial(context, config?.silentInterstitialConfig, countryConfig)
+                        }
+                    }
                 }
             }
         } catch (e: Throwable) {
@@ -230,25 +235,24 @@ internal object EventHelper {
         Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
     }
 
-    fun attachSentry(context: Context) {
-        val storeService = AndBeyondMedia.getStoreService(context)
-        val sentryInitPercentage = storeService.config?.events?.sentry ?: 100
+    fun attachSentry(context: Context, events: SDKConfig.Events?) {
+        val sentryInitPercentage = events?.sentry ?: 100
         if (shouldHandle(sentryInitPercentage) && !Sentry.isEnabled()) {
             SentryAndroid.init(context) { options ->
                 options.environment = context.packageName
                 options.dsn = "https://9bf82b481805d3068675828513d59d68@o4505753409421312.ingest.sentry.io/4505753410732032"
-                options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(storeService, event) }
+                options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> getProcessedEvent(events, event) }
             }
         }
     }
 
-    private fun getProcessedEvent(storeService: StoreService, event: SentryEvent): SentryEvent? {
+    private fun getProcessedEvent(events: SDKConfig.Events?, event: SentryEvent): SentryEvent? {
         val sentEvent = if ((event.throwable?.stackTraceToString()?.contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) == true
-                        && shouldHandle(storeService.config?.events?.self ?: 100)) || (event.throwable?.stackTraceToString()?.contains("OutOfMemoryError", true) == true
-                        && shouldHandle(storeService.config?.events?.oom ?: 100))) {
+                        && shouldHandle(events?.self ?: 100)) || (event.throwable?.stackTraceToString()?.contains("OutOfMemoryError", true) == true
+                        && shouldHandle(events?.oom ?: 100))) {
             event
         } else {
-            if (shouldHandle(storeService.config?.events?.other ?: 0)) {
+            if (shouldHandle(events?.other ?: 0)) {
                 event
             } else {
                 null
@@ -286,18 +290,23 @@ internal class ConfigSetWorker(private val context: Context, params: WorkerParam
             val response = configService.getConfig(context.packageName).execute()
             if (response.isSuccessful && response.body() != null) {
                 AndBeyondMedia.cachedConfig = response.body()
-                storeService.config = AndBeyondMedia.cachedConfig
+                storeService.setConfig(AndBeyondMedia.cachedConfig)
                 Result.success()
             } else {
-                storeService.config?.let {
-                    Result.success()
-                } ?: Result.failure()
+                storeService.getConfig {
+                    AndBeyondMedia.cachedConfig = it
+                }
+                delay(50)
+                if (AndBeyondMedia.cachedConfig == null) Result.failure() else Result.success()
+
             }
         } catch (e: Throwable) {
             Logger.ERROR.log(msg = e.message ?: "")
-            storeService.config?.let {
-                Result.success()
-            } ?: Result.failure()
+            storeService.getConfig {
+                AndBeyondMedia.cachedConfig = it
+            }
+            delay(50)
+            if (AndBeyondMedia.cachedConfig == null) Result.failure() else Result.success()
         }
     }
 }
@@ -324,30 +333,33 @@ internal class CountryDetectionWorker(private val context: Context, params: Work
                     countryService.getConfig().execute()
                 }
                 if (response.isSuccessful && response.body() != null) {
-                    storeService.detectedCountry = response.body()
+                    AndBeyondMedia.cachedCountryConfig = response.body()
+                    storeService.setDetectedCountry(AndBeyondMedia.cachedCountryConfig)
                     Result.success()
                 } else {
-                    storeService.detectedCountry?.let {
-                        Result.success()
-                    } ?: Result.failure()
+                    storeService.getDetectedCountry {
+                        AndBeyondMedia.cachedCountryConfig = it
+                    }
+                    delay(50)
+                    if (AndBeyondMedia.cachedCountryConfig == null) Result.failure() else Result.success()
                 }
             }
         } catch (e: Throwable) {
             Logger.ERROR.log(msg = e.message ?: "")
-            storeService.detectedCountry?.let {
-                Result.success()
-            } ?: Result.failure()
+            storeService.getDetectedCountry {
+                AndBeyondMedia.cachedCountryConfig = it
+            }
+            delay(50)
+            if (AndBeyondMedia.cachedCountryConfig == null) Result.failure() else Result.success()
         }
     }
 }
 
 internal object SDKManager {
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context, config: SDKConfig?) {
         initializeGAM(context)
-        val storeService = AndBeyondMedia.getStoreService(context)
-        val config = storeService.config ?: return
-        if (config.switch != 1) return
+        if (config == null || config.switch != 1) return
         initializePrebid(context, config.prebid)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
         initializeAPS(context, config.aps)
@@ -458,8 +470,8 @@ internal interface CountryService {
 
 internal class StoreService(private val prefs: SharedPreferences, private val configFile: File, private val configCountryFile: File?) {
 
-    var config: SDKConfig?
-        get() {
+    fun getConfig(callback: (SDKConfig?) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
             if (AndBeyondMedia.cachedConfig == null) {
                 AndBeyondMedia.cachedConfig = try {
                     if (configFile.exists()) {
@@ -476,29 +488,38 @@ internal class StoreService(private val prefs: SharedPreferences, private val co
             if (AndBeyondMedia.cachedConfig == null) {
                 AndBeyondMedia.cachedConfig = try {
                     val string = prefs.getString("CONFIG", "") ?: ""
-                    if (string.isEmpty()) return null
-                    GsonBuilder().create().fromJson(string, SDKConfig::class.java)
+                    if (string.isEmpty()) {
+                        null
+                    } else {
+                        GsonBuilder().create().fromJson(string, SDKConfig::class.java)
+                    }
                 } catch (_: Throwable) {
                     null
                 }
             }
-            return AndBeyondMedia.cachedConfig
+            withContext(Dispatchers.Main) {
+                callback(AndBeyondMedia.cachedConfig)
+            }
         }
-        set(value) {
+    }
+
+    fun setConfig(sdkConfig: SDKConfig?) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val oos = ObjectOutputStream(FileOutputStream(configFile))
-                oos.writeObject(value)
+                oos.writeObject(sdkConfig)
                 oos.flush()
                 oos.close()
             } catch (_: Throwable) {
                 prefs.edit().apply {
-                    value?.let { putString("CONFIG", Gson().toJson(value)) } ?: kotlin.run { remove("CONFIG") }
+                    sdkConfig?.let { putString("CONFIG", Gson().toJson(it)) } ?: kotlin.run { remove("CONFIG") }
                 }.apply()
             }
         }
+    }
 
-    var detectedCountry: CountryModel?
-        get() {
+    fun getDetectedCountry(callback: (CountryModel?) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
             if (AndBeyondMedia.cachedCountryConfig == null) {
                 AndBeyondMedia.cachedCountryConfig = try {
                     if (configCountryFile?.exists() == true) {
@@ -515,26 +536,35 @@ internal class StoreService(private val prefs: SharedPreferences, private val co
             if (AndBeyondMedia.cachedCountryConfig == null) {
                 AndBeyondMedia.cachedCountryConfig = try {
                     val string = prefs.getString("COUNTRY", "") ?: ""
-                    if (string.isEmpty()) return null
-                    GsonBuilder().create().fromJson(string, CountryModel::class.java)
+                    if (string.isEmpty()) {
+                        null
+                    } else {
+                        GsonBuilder().create().fromJson(string, CountryModel::class.java)
+                    }
                 } catch (_: Throwable) {
                     null
                 }
             }
-            return AndBeyondMedia.cachedCountryConfig
+            withContext(Dispatchers.Main) {
+                callback(AndBeyondMedia.cachedCountryConfig)
+            }
         }
-        set(value) {
+    }
+
+    fun setDetectedCountry(detectedCountry: CountryModel?) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val oos = ObjectOutputStream(FileOutputStream(configCountryFile))
-                oos.writeObject(value)
+                oos.writeObject(detectedCountry)
                 oos.flush()
                 oos.close()
             } catch (_: Throwable) {
                 prefs.edit().apply {
-                    value?.let { putString("COUNTRY", Gson().toJson(value)) } ?: kotlin.run { remove("COUNTRY") }
+                    detectedCountry?.let { putString("COUNTRY", Gson().toJson(it)) } ?: kotlin.run { remove("COUNTRY") }
                 }.apply()
             }
         }
+    }
 
     var lastInterstitial: Long
         get() = prefs.getLong("INTER_TIME", 0L)
@@ -543,19 +573,20 @@ internal class StoreService(private val prefs: SharedPreferences, private val co
 
 internal class EventHandler(private val storeService: StoreService, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, exception: Throwable) {
-
-        if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) && shouldHandle(storeService.config?.events?.self ?: 100)) {
-            Sentry.captureException(exception)
-            exitProcess(0)
-        } else if (exception.stackTraceToString().contains("OutOfMemoryError", true) && shouldHandle(storeService.config?.events?.oom ?: 100)) {
-            Sentry.captureException(exception)
-            exitProcess(0)
-        } else {
-            if (shouldHandle(storeService.config?.events?.other ?: 0)) {
+        storeService.getConfig { config ->
+            if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) && shouldHandle(config?.events?.self ?: 100)) {
+                Sentry.captureException(exception)
+                exitProcess(0)
+            } else if (exception.stackTraceToString().contains("OutOfMemoryError", true) && shouldHandle(config?.events?.oom ?: 100)) {
                 Sentry.captureException(exception)
                 exitProcess(0)
             } else {
-                defaultHandler?.uncaughtException(thread, exception)
+                if (shouldHandle(config?.events?.other ?: 0)) {
+                    Sentry.captureException(exception)
+                    exitProcess(0)
+                } else {
+                    defaultHandler?.uncaughtException(thread, exception)
+                }
             }
         }
     }

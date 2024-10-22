@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.prebid.mobile.RewardedVideoAdUnit
+import java.util.Locale
 
 internal class RewardedAdManager(private val context: Activity, private val adUnit: String) {
 
@@ -39,8 +40,10 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
     private var otherUnit = false
 
     init {
-        sdkConfig = storeService.config
-        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        storeService.getConfig {
+            sdkConfig = it
+            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        }
     }
 
     fun load(adRequest: AdRequest, callBack: (rewardedAd: RewardedAd?) -> Unit) {
@@ -182,9 +185,11 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            sdkConfig = storeService.config
-                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                            callback(shouldBeActive)
+                            storeService.getConfig {
+                                sdkConfig = it
+                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                                callback(shouldBeActive)
+                            }
                         }
                     }
                 })
@@ -221,7 +226,7 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", config.customUnitName, if (unfilled) config.unFilled?.number else if (newUnit) config.newUnit?.number else if (hijacked) config.hijack?.number else config.position)
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", config.customUnitName, if (unfilled) config.unFilled?.number else if (newUnit) config.newUnit?.number else if (hijacked) config.hijack?.number else config.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {

@@ -92,8 +92,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     var pendingImpression = false
 
     init {
-        sdkConfig = storeService.config
-        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        storeService.getConfig {
+            sdkConfig = it
+            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        }
         getCountryConfig()
     }
 
@@ -146,7 +148,9 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            countrySetup = Triple(true, false, storeService.detectedCountry)
+                            storeService.getDetectedCountry {
+                                countrySetup = Triple(true, false, it)
+                            }
                         }
                     }
                 })
@@ -170,14 +174,16 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            sdkConfig = storeService.config
-                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                            actualCallback?.invoke(shouldBeActive)
-                            actualCallback = null
+                            storeService.getConfig {
+                                sdkConfig = it
+                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                                actualCallback?.invoke(shouldBeActive)
+                                actualCallback = null
+                            }
                         }
                     }
                 })
-            } catch (e: Throwable) {
+            } catch (_: Throwable) {
                 actualCallback?.invoke(false)
                 actualCallback = null
             }
@@ -189,7 +195,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun setSudoConfig(sdkConfig: SDKConfig?) {
-        this.sdkConfig = storeService.config
+        this.sdkConfig = sdkConfig
         shouldBeActive = !(sdkConfig == null || sdkConfig.switch != 1)
     }
 
