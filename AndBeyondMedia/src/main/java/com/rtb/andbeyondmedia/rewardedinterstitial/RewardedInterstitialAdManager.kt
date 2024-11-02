@@ -20,7 +20,8 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import org.prebid.mobile.InterstitialAdUnit
@@ -39,10 +40,8 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
     private var otherUnit = false
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
     fun load(adRequest: AdRequest, callBack: (rewardedInterstitialAd: RewardedInterstitialAd?) -> Unit) {
@@ -174,7 +173,7 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
@@ -184,11 +183,9 @@ internal class RewardedInterstitialAdManager(private val context: Activity, priv
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                callback(shouldBeActive)
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
                         }
                     }
                 })

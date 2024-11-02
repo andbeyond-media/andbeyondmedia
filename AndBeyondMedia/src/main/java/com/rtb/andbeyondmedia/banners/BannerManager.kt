@@ -29,7 +29,6 @@ import com.google.gson.Gson
 import com.rtb.andbeyondmedia.BuildConfig
 import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
-import com.rtb.andbeyondmedia.common.connectionAvailable
 import com.rtb.andbeyondmedia.common.getAddress
 import com.rtb.andbeyondmedia.common.getCountry
 import com.rtb.andbeyondmedia.common.getHardwareDeviceId
@@ -37,7 +36,8 @@ import com.rtb.andbeyondmedia.common.getLocation
 import com.rtb.andbeyondmedia.common.getUniqueId
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerManagerListener
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.CountryDetectionWorker
 import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.Fallback
@@ -79,7 +79,6 @@ internal class BannerManager(private val context: Context, private val bannerLis
     private var sdkConfig: SDKConfig? = null
     private var shouldBeActive: Boolean = false
     private var wasFirstLook = true
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var isForegroundRefresh = 1
     private var overridingUnit: String? = null
     private var refreshBlocked = false
@@ -92,10 +91,8 @@ internal class BannerManager(private val context: Context, private val bannerLis
     var pendingImpression = false
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
         getCountryConfig()
     }
 
@@ -148,9 +145,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getDetectedCountry {
-                                countrySetup = Triple(true, false, it)
-                            }
+                            countrySetup = Triple(true, false, ConfigProvider.getDetectedCountry(context))
                         }
                     }
                 })
@@ -160,10 +155,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
+    fun shouldSetConfig(callback: (Boolean) -> Unit) {
         var actualCallback: ((Boolean) -> Unit)? = callback
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             actualCallback?.invoke(false)
             actualCallback = null
@@ -174,12 +169,10 @@ internal class BannerManager(private val context: Context, private val bannerLis
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                actualCallback?.invoke(shouldBeActive)
-                                actualCallback = null
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            actualCallback?.invoke(shouldBeActive)
+                            actualCallback = null
                         }
                     }
                 })
@@ -624,7 +617,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
             }
         }
 
-        if (context.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity) && canRefresh()) {
+        if (AndBeyondMedia.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity) && canRefresh()) {
             refreshAd()
         } else {
             startRefreshing(timers = timers)

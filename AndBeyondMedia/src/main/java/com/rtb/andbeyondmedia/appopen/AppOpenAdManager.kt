@@ -18,7 +18,8 @@ import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AdLoadCallback
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.Logger
 import com.rtb.andbeyondmedia.sdk.OnShowAdCompleteListener
 import com.rtb.andbeyondmedia.sdk.SDKConfig
@@ -27,13 +28,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Date
+import java.util.Locale
 
 class AppOpenAdManager(private val context: Context, private val adUnit: String?) {
     private var appOpenAd: AppOpenAd? = null
     private var isLoadingAd = false
     private var loadTime: Long = 0
     private var sdkConfig: SDKConfig? = null
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var appOpenConfig = AppOpenConfig()
     private var shouldBeActive: Boolean = false
     private var firstLook: Boolean = true
@@ -43,10 +44,8 @@ class AppOpenAdManager(private val context: Context, private val adUnit: String?
     var isShowingAd = false
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
     private fun load(context: Context, adLoadCallback: AdLoadCallback? = null) {
@@ -160,7 +159,7 @@ class AppOpenAdManager(private val context: Context, private val adUnit: String?
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
@@ -170,11 +169,9 @@ class AppOpenAdManager(private val context: Context, private val adUnit: String?
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                callback(shouldBeActive)
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
                         }
                     }
                 })
@@ -220,7 +217,8 @@ class AppOpenAdManager(private val context: Context, private val adUnit: String?
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return overridingUnit ?: String.format("%s-%d", appOpenConfig.customUnitName, if (unfilled) appOpenConfig.unFilled?.number else if (newUnit) appOpenConfig.newUnit?.number else if (hijacked) appOpenConfig.hijack?.number else appOpenConfig.position)
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", appOpenConfig.customUnitName,
+                if (unfilled) appOpenConfig.unFilled?.number else if (newUnit) appOpenConfig.newUnit?.number else if (hijacked) appOpenConfig.hijack?.number else appOpenConfig.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {

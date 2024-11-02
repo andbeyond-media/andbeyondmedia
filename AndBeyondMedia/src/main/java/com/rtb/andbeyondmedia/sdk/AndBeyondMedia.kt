@@ -5,16 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
-import androidx.work.Constraints
-import androidx.work.CoroutineWorker
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkInfo
+import android.os.Process
 import androidx.work.WorkManager
-import androidx.work.WorkerParameters
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
 import com.amazon.device.ads.DTBAdNetworkInfo
@@ -24,12 +16,9 @@ import com.appharbr.sdk.engine.AppHarbr
 import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
 import com.google.android.gms.ads.MobileAds
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.pubmatic.sdk.common.OpenWrapSDK
 import com.pubmatic.sdk.common.models.POBApplicationInfo
 import com.rtb.andbeyondmedia.BuildConfig
-import com.rtb.andbeyondmedia.common.URLs.BASE_URL
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitial
 import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
@@ -41,90 +30,36 @@ import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
 import org.prebid.mobile.TargetingParams
 import org.prebid.mobile.rendering.models.openrtb.bidRequests.Ext
-import retrofit2.Call
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
-import retrofit2.http.Path
-import retrofit2.http.QueryMap
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
 import java.net.MalformedURLException
 import java.net.URL
-import java.util.concurrent.TimeUnit
-import kotlin.system.exitProcess
 
 
 object AndBeyondMedia {
     private var storeService: StoreService? = null
-    private var configService: ConfigService? = null
-    private var countryService: CountryService? = null
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
-    internal var cachedConfig: SDKConfig? = null
-    internal var cachedCountryConfig: CountryModel? = null
-    internal var configFile: File? = null
-    internal var configCountryFile: File? = null
     private var silentInterstitial = SilentInterstitial()
+    internal var networkManager = NetworkManager()
 
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         attachEventHandler(context)
         this.logEnabled = logsEnabled
-        fetchConfig(context)
+        networkManager.register(context)
+        ConfigProvider.fetchConfig(context)
     }
 
     @Synchronized
     internal fun getStoreService(context: Context): StoreService {
         if (storeService == null) {
-            if (configFile == null) {
-                configFile = File(context.applicationContext.filesDir, "config_file")
-            }
-            if (configCountryFile == null) {
-                configCountryFile = File(context.applicationContext.filesDir, "country_config_file")
-            }
-            configFile?.let {
-                storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE), it, configCountryFile)
-            }
+            storeService = StoreService(context.getSharedPreferences(this.toString().substringBefore("@"), Context.MODE_PRIVATE))
         }
         return storeService as StoreService
-    }
-
-    @Synchronized
-    internal fun getConfigService(): ConfigService {
-        if (configService == null) {
-            val client = OkHttpClient.Builder()
-                    .connectTimeout(3, TimeUnit.SECONDS)
-                    .writeTimeout(3, TimeUnit.SECONDS)
-                    .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
-            configService = Retrofit.Builder().baseUrl(BASE_URL).client(client)
-                    .addConverterFactory(GsonConverterFactory.create()).build().create(ConfigService::class.java)
-        }
-        return configService as ConfigService
-    }
-
-    @Synchronized
-    internal fun getCountryService(baseUrl: String): CountryService {
-        if (countryService == null) {
-            val client = OkHttpClient.Builder()
-                    .connectTimeout(3, TimeUnit.SECONDS)
-                    .writeTimeout(3, TimeUnit.SECONDS)
-                    .readTimeout(3, TimeUnit.SECONDS).hostnameVerifier { _, _ -> true }.build()
-            countryService = Retrofit.Builder().baseUrl(baseUrl).client(client)
-                    .addConverterFactory(GsonConverterFactory.create()).build().create(CountryService::class.java)
-        }
-        return countryService as CountryService
     }
 
     @Synchronized
@@ -135,73 +70,22 @@ object AndBeyondMedia {
         return workManager as WorkManager
     }
 
-    private fun fetchConfig(context: Context, delay: Long? = null) {
-        if (delay != null && delay < 900) return
-        try {
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            val workerRequest: OneTimeWorkRequest = delay?.let {
-                OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).setInitialDelay(it, TimeUnit.SECONDS).build()
-            } ?: kotlin.run {
-                OneTimeWorkRequestBuilder<ConfigSetWorker>().setConstraints(constraints).build()
-            }
-            val workName: String = delay?.let {
-                String.format("%s_%s", ConfigSetWorker::class.java.simpleName, it.toString())
-            } ?: kotlin.run {
-                ConfigSetWorker::class.java.simpleName
-            }
-            val workManager = getWorkManager(context)
-            val storeService = getStoreService(context)
-            workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
-            workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
-                if (it?.state == WorkInfo.State.SUCCEEDED) {
-                    storeService.getConfig { config ->
-                        specialTag = config?.infoConfig?.specialTag
-                        logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
-                        if (config?.countryStatus?.active == 1 && !config.countryStatus.url.isNullOrEmpty()) {
-                            fetchCountry(context, config.countryStatus.url)
-                        }
-                        attachSentry(context, config?.events)
-                        SDKManager.initialize(context, config)
-                        if (config?.refetch != null) {
-                            fetchConfig(context, config.refetch)
-                        }
-                    }
-                }
-            }
-        } catch (_: Throwable) {
-            SDKManager.initialize(context, null)
-        }
+    internal fun connectionAvailable(): Boolean {
+        return networkManager.isInternetAvailable
     }
 
-    private fun fetchCountry(context: Context, baseUrl: String) {
-        try {
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            val data = Data.Builder()
-            data.putString("URL", baseUrl)
-            val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<CountryDetectionWorker>().setConstraints(constraints).setInputData(data.build()).build()
-            val workName: String = CountryDetectionWorker::class.java.simpleName
-            val workManager = getWorkManager(context)
-            val storeService = getStoreService(context)
-            workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
-            workManager.getWorkInfoByIdLiveData(workerRequest.id).observeForever {
-                if (it?.state == WorkInfo.State.SUCCEEDED) {
-                    storeService.getConfig { config ->
-                        storeService.getDetectedCountry { countryConfig ->
-                            checkForSilentInterstitial(context, config?.silentInterstitialConfig, countryConfig)
-                        }
-                    }
-                }
-            }
-        } catch (e: Throwable) {
-            e.stackTrace
-        }
+    internal fun configFetched(context: Context, config: SDKConfig?) {
+        specialTag = config?.infoConfig?.specialTag
+        logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
+        attachSentry(context, config?.events)
+        SDKManager.initialize(context, config)
     }
 
     fun registerActivity(activity: Activity) {
         silentInterstitial.registerActivity(activity)
     }
 
-    private fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?, countryConfig: CountryModel?) {
+    internal fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?, countryConfig: CountryModel?) {
         if (silentInterstitialConfig == null) {
             silentInterstitial.destroy()
             return
@@ -231,8 +115,7 @@ object AndBeyondMedia {
 internal object EventHelper {
 
     fun attachEventHandler(context: Context) {
-        val storeService = AndBeyondMedia.getStoreService(context)
-        Thread.setDefaultUncaughtExceptionHandler(EventHandler(storeService, Thread.getDefaultUncaughtExceptionHandler()))
+        Thread.setDefaultUncaughtExceptionHandler(EventHandler(context, Thread.getDefaultUncaughtExceptionHandler()))
     }
 
     fun attachSentry(context: Context, events: SDKConfig.Events?) {
@@ -275,86 +158,15 @@ internal object EventHelper {
         return try {
             val number = (1..100).random()
             number in 1..max
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             false
         }
 
     }
 }
 
-internal class ConfigSetWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val storeService = AndBeyondMedia.getStoreService(context)
-        return try {
-            val configService = AndBeyondMedia.getConfigService()
-            val response = configService.getConfig(context.packageName).execute()
-            if (response.isSuccessful && response.body() != null) {
-                AndBeyondMedia.cachedConfig = response.body()
-                storeService.setConfig(AndBeyondMedia.cachedConfig)
-                Result.success()
-            } else {
-                storeService.getConfig {
-                    AndBeyondMedia.cachedConfig = it
-                }
-                delay(50)
-                if (AndBeyondMedia.cachedConfig == null) Result.failure() else Result.success()
 
-            }
-        } catch (e: Throwable) {
-            Logger.ERROR.log(msg = e.message ?: "")
-            storeService.getConfig {
-                AndBeyondMedia.cachedConfig = it
-            }
-            delay(50)
-            if (AndBeyondMedia.cachedConfig == null) Result.failure() else Result.success()
-        }
-    }
-}
-
-internal class CountryDetectionWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val storeService = AndBeyondMedia.getStoreService(context)
-        return try {
-            var baseUrl = inputData.getString("URL")
-            baseUrl = if (baseUrl?.contains("apiip") == true) {
-                baseUrl.substring(0, baseUrl.indexOf("check"))
-            } else if (baseUrl?.contains("andbeyond") == true) {
-                baseUrl.substring(0, baseUrl.indexOf("maxmind"))
-            } else {
-                ""
-            }
-            if (baseUrl.isEmpty()) {
-                Result.failure()
-            } else {
-                val countryService = AndBeyondMedia.getCountryService(baseUrl)
-                val response = if (baseUrl.contains("apiip")) {
-                    countryService.getConfig(hashMapOf("accessKey" to "7ef45bac-167a-4aa8-8c99-bc8a28f80bc5", "fields" to "countryCode,latitude,longitude,city,regionCode,ip,postalCode")).execute()
-                } else {
-                    countryService.getConfig().execute()
-                }
-                if (response.isSuccessful && response.body() != null) {
-                    AndBeyondMedia.cachedCountryConfig = response.body()
-                    storeService.setDetectedCountry(AndBeyondMedia.cachedCountryConfig)
-                    Result.success()
-                } else {
-                    storeService.getDetectedCountry {
-                        AndBeyondMedia.cachedCountryConfig = it
-                    }
-                    delay(50)
-                    if (AndBeyondMedia.cachedCountryConfig == null) Result.failure() else Result.success()
-                }
-            }
-        } catch (e: Throwable) {
-            Logger.ERROR.log(msg = e.message ?: "")
-            storeService.getDetectedCountry {
-                AndBeyondMedia.cachedCountryConfig = it
-            }
-            delay(50)
-            if (AndBeyondMedia.cachedCountryConfig == null) Result.failure() else Result.success()
-        }
-    }
-}
-
+@Suppress("UNNECESSARY_SAFE_CALL")
 internal object SDKManager {
 
     fun initialize(context: Context, config: SDKConfig?) {
@@ -455,135 +267,26 @@ internal object SDKManager {
     }
 }
 
-internal interface ConfigService {
-    @GET("appconfig_{package}.js")
-    fun getConfig(@Path("package") packageName: String): Call<SDKConfig>
-}
-
-internal interface CountryService {
-    @GET("check")
-    fun getConfig(@QueryMap params: HashMap<String, Any>): Call<CountryModel>
-
-    @GET("maxmind.php")
-    fun getConfig(): Call<CountryModel>
-}
-
-internal class StoreService(private val prefs: SharedPreferences, private val configFile: File, private val configCountryFile: File?) {
-
-    fun getConfig(callback: (SDKConfig?) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            if (AndBeyondMedia.cachedConfig == null) {
-                AndBeyondMedia.cachedConfig = try {
-                    if (configFile.exists()) {
-                        val ois = ObjectInputStream(FileInputStream(configFile))
-                        ois.readObject() as? SDKConfig
-                    } else {
-                        null
-                    }
-                } catch (_: Throwable) {
-                    null
-                }
-            }
-
-            if (AndBeyondMedia.cachedConfig == null) {
-                AndBeyondMedia.cachedConfig = try {
-                    val string = prefs.getString("CONFIG", "") ?: ""
-                    if (string.isEmpty()) {
-                        null
-                    } else {
-                        GsonBuilder().create().fromJson(string, SDKConfig::class.java)
-                    }
-                } catch (_: Throwable) {
-                    null
-                }
-            }
-            withContext(Dispatchers.Main) {
-                callback(AndBeyondMedia.cachedConfig)
-            }
-        }
-    }
-
-    fun setConfig(sdkConfig: SDKConfig?) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val oos = ObjectOutputStream(FileOutputStream(configFile))
-                oos.writeObject(sdkConfig)
-                oos.flush()
-                oos.close()
-            } catch (_: Throwable) {
-                prefs.edit().apply {
-                    sdkConfig?.let { putString("CONFIG", Gson().toJson(it)) } ?: kotlin.run { remove("CONFIG") }
-                }.apply()
-            }
-        }
-    }
-
-    fun getDetectedCountry(callback: (CountryModel?) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            if (AndBeyondMedia.cachedCountryConfig == null) {
-                AndBeyondMedia.cachedCountryConfig = try {
-                    if (configCountryFile?.exists() == true) {
-                        val ois = ObjectInputStream(FileInputStream(configCountryFile))
-                        ois.readObject() as? CountryModel
-                    } else {
-                        null
-                    }
-                } catch (_: Throwable) {
-                    null
-                }
-            }
-
-            if (AndBeyondMedia.cachedCountryConfig == null) {
-                AndBeyondMedia.cachedCountryConfig = try {
-                    val string = prefs.getString("COUNTRY", "") ?: ""
-                    if (string.isEmpty()) {
-                        null
-                    } else {
-                        GsonBuilder().create().fromJson(string, CountryModel::class.java)
-                    }
-                } catch (_: Throwable) {
-                    null
-                }
-            }
-            withContext(Dispatchers.Main) {
-                callback(AndBeyondMedia.cachedCountryConfig)
-            }
-        }
-    }
-
-    fun setDetectedCountry(detectedCountry: CountryModel?) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val oos = ObjectOutputStream(FileOutputStream(configCountryFile))
-                oos.writeObject(detectedCountry)
-                oos.flush()
-                oos.close()
-            } catch (_: Throwable) {
-                prefs.edit().apply {
-                    detectedCountry?.let { putString("COUNTRY", Gson().toJson(it)) } ?: kotlin.run { remove("COUNTRY") }
-                }.apply()
-            }
-        }
-    }
+internal class StoreService(private val prefs: SharedPreferences) {
 
     var lastInterstitial: Long
         get() = prefs.getLong("INTER_TIME", 0L)
         set(value) = prefs.edit().putLong("INTER_TIME", value).apply()
 }
 
-internal class EventHandler(private val storeService: StoreService, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+internal class EventHandler(private val context: Context, private val defaultHandler: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, exception: Throwable) {
-        storeService.getConfig { config ->
+        ConfigProvider.getConfig(context).let { config ->
             if (exception.stackTraceToString().contains(BuildConfig.LIBRARY_PACKAGE_NAME, true) && shouldHandle(config?.events?.self ?: 100)) {
                 Sentry.captureException(exception)
-                exitProcess(0)
+                Process.killProcess(Process.myPid())
             } else if (exception.stackTraceToString().contains("OutOfMemoryError", true) && shouldHandle(config?.events?.oom ?: 100)) {
                 Sentry.captureException(exception)
-                exitProcess(0)
+                Process.killProcess(Process.myPid())
             } else {
                 if (shouldHandle(config?.events?.other ?: 0)) {
                     Sentry.captureException(exception)
-                    exitProcess(0)
+                    Process.killProcess(Process.myPid())
                 } else {
                     defaultHandler?.uncaughtException(thread, exception)
                 }

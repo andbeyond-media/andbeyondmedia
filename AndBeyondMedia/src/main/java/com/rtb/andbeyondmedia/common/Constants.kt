@@ -6,6 +6,11 @@ internal object URLs {
      const val BASE_URL = "https://rtbcdn.andbeyond.media/"
 }
 
+internal object Files {
+    const val CONFIG_FILE = "config_file"
+    const val COUNTRY_CONFIG_FILE = "country_config_file"
+}
+
 object AdTypes {
     const val BANNER = "BANNER"
     const val ADAPTIVE = "ADAPTIVE"

@@ -694,7 +694,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
             var retryStatus = try {
                 bannerManager.adFailedToLoad(tempStatus)
-            } catch (e: Throwable) {
+            } catch (_: Throwable) {
                 false
             }
             if (!retryStatus) {

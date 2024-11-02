@@ -23,7 +23,8 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +42,6 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     private var sdkConfig: SDKConfig? = null
     private var nativeConfig: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
     private var otherUnit = false
@@ -54,10 +54,8 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     var owTestMode: Boolean? = null
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
     fun setAdListener(adListener: AdListener) {
@@ -304,7 +302,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
@@ -314,11 +312,9 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                callback(shouldBeActive)
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
                         }
                     }
                 })

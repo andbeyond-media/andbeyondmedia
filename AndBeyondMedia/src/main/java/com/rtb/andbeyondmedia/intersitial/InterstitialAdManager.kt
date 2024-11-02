@@ -30,7 +30,8 @@ import com.rtb.andbeyondmedia.common.AdRequest
 import com.rtb.andbeyondmedia.common.AdTypes
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
@@ -42,6 +43,7 @@ import org.prebid.mobile.Signals
 import org.prebid.mobile.VideoParameters
 import org.prebid.mobile.api.data.AdUnitFormat
 import java.util.EnumSet
+import java.util.Locale
 
 internal class InterstitialAdManager(private val context: Activity, private val adUnit: String) {
 
@@ -49,7 +51,6 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     private var countryData: CountryModel? = null
     private var interstitialConfig: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
     private var otherUnit = false
@@ -58,13 +59,9 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     var owTestMode: Boolean? = null
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
-        storeService.getDetectedCountry {
-            countryData = it
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+        countryData = ConfigProvider.getDetectedCountry(context)
     }
 
     fun loadWithOW(pubID: String, profile: Int, owAdUnitId: String, configListener: DFPInterstitialEventHandler.DFPConfigListener?,
@@ -314,7 +311,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
@@ -324,11 +321,9 @@ internal class InterstitialAdManager(private val context: Activity, private val 
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                callback(shouldBeActive)
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
                         }
                     }
                 })
@@ -366,8 +361,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     }
 
     private fun getAdUnitName(unfilled: Boolean, hijacked: Boolean, newUnit: Boolean): String {
-        return "12345"
-        // return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
+        return overridingUnit ?: String.format(Locale.ENGLISH, "%s-%d", interstitialConfig.customUnitName, if (unfilled) interstitialConfig.unFilled?.number else if (newUnit) interstitialConfig.newUnit?.number else if (hijacked) interstitialConfig.hijack?.number else interstitialConfig.position)
     }
 
     private fun createRequest(unfilled: Boolean = false, hijacked: Boolean = false) = AdRequest().Builder().apply {

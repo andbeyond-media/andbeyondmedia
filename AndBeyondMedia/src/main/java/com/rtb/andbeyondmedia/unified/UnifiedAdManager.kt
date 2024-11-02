@@ -21,7 +21,8 @@ import com.rtb.andbeyondmedia.intersitial.InterstitialConfig
 import com.rtb.andbeyondmedia.sdk.ABMError
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
-import com.rtb.andbeyondmedia.sdk.ConfigSetWorker
+import com.rtb.andbeyondmedia.sdk.ConfigFetchWorker
+import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.CountryModel
 import com.rtb.andbeyondmedia.sdk.SDKConfig
 import com.rtb.andbeyondmedia.sdk.log
@@ -40,7 +41,6 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     private var countryConfig: CountryModel? = null
     private var nativeConfig: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var adOptions = NativeAdOptions.Builder().build()
     private var loadCount: Int = 0
     private var adListener: UnifiedAdListener? = null
@@ -51,10 +51,8 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     private var customAdFormatIds: List<String> = arrayListOf()
 
     init {
-        storeService.getConfig {
-            sdkConfig = it
-            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-        }
+        sdkConfig = ConfigProvider.getConfig(context)
+        shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
 
     fun setAdListener(adListener: UnifiedAdListener) {
@@ -282,7 +280,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     @Suppress("UNNECESSARY_SAFE_CALL")
     private fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         val workManager = AndBeyondMedia.getWorkManager(context)
-        val workers = workManager.getWorkInfosForUniqueWork(ConfigSetWorker::class.java.simpleName).get()
+        val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
         if (workers.isNullOrEmpty()) {
             callback(false)
         } else {
@@ -292,11 +290,9 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
                     override fun onChanged(value: WorkInfo?) {
                         if (value?.state != WorkInfo.State.RUNNING && value?.state != WorkInfo.State.ENQUEUED) {
                             workerData.removeObserver(this)
-                            storeService.getConfig {
-                                sdkConfig = it
-                                shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
-                                callback(shouldBeActive)
-                            }
+                            sdkConfig = ConfigProvider.getConfig(context)
+                            shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
+                            callback(shouldBeActive)
                         }
                     }
                 })
@@ -328,9 +324,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
             hijack = sdkConfig?.hijackConfig?.native ?: sdkConfig?.hijackConfig?.other
             unFilled = sdkConfig?.unfilledConfig?.native ?: sdkConfig?.unfilledConfig?.other
         }
-        storeService.getDetectedCountry {
-            countryConfig = it
-        }
+        countryConfig = ConfigProvider.getDetectedCountry(context)
         adUnit.log { "setConfig :$nativeConfig" }
     }
 
