@@ -6,6 +6,8 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import androidx.work.WorkManager
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
@@ -46,12 +48,30 @@ object AndBeyondMedia {
     internal var specialTag: String? = null
     private var silentInterstitial = SilentInterstitial()
     internal var networkManager = NetworkManager()
+    internal var fetchedConfig = MutableLiveData<Boolean>(false)
 
-    fun initialize(context: Context, logsEnabled: Boolean = false) {
+    fun initialize(context: Activity, logsEnabled: Boolean = false) {
         attachEventHandler(context)
         this.logEnabled = logsEnabled
         networkManager.register(context)
+        waitForConfig(context)
         ConfigProvider.fetchConfig(context)
+    }
+
+    private fun waitForConfig(activity: Activity) {
+        fetchedConfig.observeForever(object : Observer<Boolean> {
+            override fun onChanged(fetched: Boolean) {
+                if (fetched) {
+                    fetchedConfig.removeObserver(this)
+                    if (!(activity.isDestroyed && activity.isFinishing)) {
+                        val config = ConfigProvider.getConfig(activity)
+                        if (config != null && config.switch == 1) {
+                            SDKManager.initializePrebid(activity, config.prebid)
+                        }
+                    }
+                }
+            }
+        })
     }
 
     @Synchronized
@@ -172,46 +192,49 @@ internal object SDKManager {
     fun initialize(context: Context, config: SDKConfig?) {
         initializeGAM(context)
         if (config == null || config.switch != 1) return
-        initializePrebid(context, config.prebid)
         initializeGeoEdge(context, config.geoEdge?.apiKey)
         initializeAPS(context, config.aps)
         initializeOpenWrap(config.openWrapConfig)
     }
 
-    private fun initializePrebid(context: Context, prebid: SDKConfig.Prebid?) = CoroutineScope(Dispatchers.Main).launch {
-        PrebidMobile.setPbsDebug(prebid?.debug == 1)
-        PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
-        PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
-        PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
-        PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
-        PrebidMobile.setShareGeoLocation(prebid?.location == null || prebid.location == 1)
-        prebid?.gdpr?.let { TargetingParams.setSubjectToGDPR(it == 1) }
-        if (TargetingParams.isSubjectToGDPR() == true) {
-            TargetingParams.setGDPRConsentString(TargetingParams.getGDPRConsentString())
-        }
-        if (!prebid?.bundleName.isNullOrEmpty()) {
-            TargetingParams.setBundleName(prebid?.bundleName)
-        }
-        if (!prebid?.domain.isNullOrEmpty()) {
-            TargetingParams.setDomain(prebid?.domain)
-        }
-        if (!prebid?.storeURL.isNullOrEmpty()) {
-            TargetingParams.setStoreUrl(prebid?.storeURL)
-        }
-        if (!prebid?.omidPartnerName.isNullOrEmpty()) {
-            TargetingParams.setOmidPartnerName(prebid?.omidPartnerName)
-        }
-        if (!prebid?.omidPartnerVersion.isNullOrEmpty()) {
-            TargetingParams.setOmidPartnerVersion(prebid?.omidPartnerVersion)
-        }
-        if (!prebid?.extParams.isNullOrEmpty()) {
-            TargetingParams.setUserExt(Ext().apply {
-                prebid?.extParams?.forEach { put(it.key ?: "", it.value ?: "") }
-            })
+    fun initializePrebid(context: Activity, prebid: SDKConfig.Prebid?) = CoroutineScope(Dispatchers.Main).launch {
+        if (PrebidMobile.isSdkInitialized()) return@launch
+        try {
+            PrebidMobile.setPbsDebug(prebid?.debug == 1)
+            PrebidMobile.setPrebidServerHost(Host.createCustomHost(prebid?.host ?: ""))
+            PrebidMobile.setPrebidServerAccountId(prebid?.accountId ?: "")
+            PrebidMobile.setTimeoutMillis(prebid?.timeout?.toIntOrNull() ?: 1000)
+            PrebidMobile.initializeSdk(context) { Logger.INFO.log(msg = "Prebid Initialization Completed") }
+            PrebidMobile.setShareGeoLocation(prebid?.location == null || prebid.location == 1)
+            prebid?.gdpr?.let { TargetingParams.setSubjectToGDPR(it == 1) }
+            if (TargetingParams.isSubjectToGDPR() == true) {
+                TargetingParams.setGDPRConsentString(TargetingParams.getGDPRConsentString())
+            }
+            if (!prebid?.bundleName.isNullOrEmpty()) {
+                TargetingParams.setBundleName(prebid?.bundleName)
+            }
+            if (!prebid?.domain.isNullOrEmpty()) {
+                TargetingParams.setDomain(prebid?.domain)
+            }
+            if (!prebid?.storeURL.isNullOrEmpty()) {
+                TargetingParams.setStoreUrl(prebid?.storeURL)
+            }
+            if (!prebid?.omidPartnerName.isNullOrEmpty()) {
+                TargetingParams.setOmidPartnerName(prebid?.omidPartnerName)
+            }
+            if (!prebid?.omidPartnerVersion.isNullOrEmpty()) {
+                TargetingParams.setOmidPartnerVersion(prebid?.omidPartnerVersion)
+            }
+            if (!prebid?.extParams.isNullOrEmpty()) {
+                TargetingParams.setUserExt(Ext().apply {
+                    prebid?.extParams?.forEach { put(it.key ?: "", it.value ?: "") }
+                })
+            }
+        } catch (_: Throwable) {
         }
     }
 
-    private fun initializeGAM(context: Context) {
+    private fun initializeGAM(context: Context) = CoroutineScope(Dispatchers.IO).launch {
         MobileAds.initialize(context) {
             Logger.INFO.log(msg = "GAM Initialization complete.")
         }

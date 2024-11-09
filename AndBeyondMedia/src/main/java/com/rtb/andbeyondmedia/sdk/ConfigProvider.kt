@@ -206,6 +206,7 @@ internal class ConfigFetchWorker(private val context: Context, params: WorkerPar
                 fetchDetectedCountry(countryFetchStatus.url)
             }
             AndBeyondMedia.configFetched(context, config)
+            AndBeyondMedia.fetchedConfig.postValue(true)
         }
         return result
     }

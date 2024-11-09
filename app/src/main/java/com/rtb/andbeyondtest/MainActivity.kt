@@ -18,6 +18,7 @@ import com.rtb.andbeyondmedia.nativeformat.NativeAdManager
 import com.rtb.andbeyondmedia.rewarded.RewardedAd
 import com.rtb.andbeyondmedia.rewardedinterstitial.RewardedInterstitialAd
 import com.rtb.andbeyondmedia.sdk.ABMError
+import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.unified.UnifiedAdListener
 import com.rtb.andbeyondmedia.unified.UnifiedAdManager
@@ -44,6 +45,7 @@ class MainActivity : AppCompatActivity(), BannerAdListener {
     }
 
     private fun init() {
+        AndBeyondMedia.initialize(this, true)
         binding.showInterstitial.setOnClickListener { interstitialAd?.show() }
         binding.showInterstitialRewarded.setOnClickListener {
             rewardedInterstitialAd?.show {

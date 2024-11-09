@@ -9,7 +9,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.rtb.andbeyondmedia.appopen.AppOpenAdManager
 import com.rtb.andbeyondmedia.sdk.ABMError
-import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.FullScreenContentCallback
 
 class ThisApplication : Application() {
@@ -24,7 +23,6 @@ class ThisApplication : Application() {
         lifeCyclerHandler = ActivityLifecycleHandler()
         registerActivityLifecycleCallbacks(lifeCyclerHandler)
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifeCyclerHandler)
-        AndBeyondMedia.initialize(this, true)
         appOpenAdManager = AppOpenAdManager(this, adUnitId)
         appOpenAdManager.fullScreenContentCallback = fullScreenContentCallback
     }
