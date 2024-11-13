@@ -35,12 +35,12 @@ internal class RewardedAdManager(private val context: Activity, private val adUn
     private var sdkConfig: SDKConfig? = null
     private var config: InterstitialConfig = InterstitialConfig()
     private var shouldBeActive: Boolean = false
-    private val storeService = AndBeyondMedia.getStoreService(context)
     private var firstLook: Boolean = true
     private var overridingUnit: String? = null
     private var otherUnit = false
 
     init {
+        AndBeyondMedia.registerActivity(context)
         sdkConfig = ConfigProvider.getConfig(context)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }

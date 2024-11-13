@@ -6,8 +6,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
+import androidx.annotation.MainThread
 import androidx.work.WorkManager
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
@@ -26,6 +25,7 @@ import com.rtb.andbeyondmedia.intersitial.SilentInterstitialConfig
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachEventHandler
 import com.rtb.andbeyondmedia.sdk.EventHelper.attachSentry
 import com.rtb.andbeyondmedia.sdk.EventHelper.shouldHandle
+import com.rtb.andbeyondmedia.sdk.SDKManager.initializePrebid
 import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
@@ -48,30 +48,14 @@ object AndBeyondMedia {
     internal var specialTag: String? = null
     private var silentInterstitial = SilentInterstitial()
     internal var networkManager = NetworkManager()
-    internal var fetchedConfig = MutableLiveData<Boolean>(false)
 
-    fun initialize(context: Activity, logsEnabled: Boolean = false) {
+    @MainThread
+    fun initialize(context: Context, logsEnabled: Boolean = false) {
+        log("ABM Version ${BuildConfig.ADAPTER_VERSION} initialized.")
         attachEventHandler(context)
         this.logEnabled = logsEnabled
         networkManager.register(context)
-        waitForConfig(context)
         ConfigProvider.fetchConfig(context)
-    }
-
-    private fun waitForConfig(activity: Activity) {
-        fetchedConfig.observeForever(object : Observer<Boolean> {
-            override fun onChanged(fetched: Boolean) {
-                if (fetched) {
-                    fetchedConfig.removeObserver(this)
-                    if (!(activity.isDestroyed && activity.isFinishing)) {
-                        val config = ConfigProvider.getConfig(activity)
-                        if (config != null && config.switch == 1) {
-                            SDKManager.initializePrebid(activity, config.prebid)
-                        }
-                    }
-                }
-            }
-        })
     }
 
     @Synchronized
@@ -99,10 +83,24 @@ object AndBeyondMedia {
         logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
         attachSentry(context, config?.events)
         SDKManager.initialize(context, config)
+        initPrebid()
     }
 
-    fun registerActivity(activity: Activity) {
-        silentInterstitial.registerActivity(activity)
+    internal fun initPrebid() {
+        silentInterstitial.findContext()?.let { activity ->
+            if (!(activity.isDestroyed && activity.isFinishing)) {
+                val config = ConfigProvider.getConfig(activity)
+                if (config != null && config.switch == 1) {
+                    initializePrebid(activity, config.prebid)
+                }
+            }
+        }
+    }
+
+    internal fun registerActivity(context: Context) {
+        (context as? Activity)?.let {
+            silentInterstitial.registerActivity(it)
+        }
     }
 
     internal fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?, countryConfig: CountryModel?) {

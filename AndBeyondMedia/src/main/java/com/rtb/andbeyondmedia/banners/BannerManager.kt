@@ -733,7 +733,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     fun fetchDemand(firstLook: Boolean, adRequest: AdManagerAdRequest, callback: (AdManagerAdRequest) -> Unit) {
-
+        AndBeyondMedia.initPrebid()
         var prebidAvailable = if (
                 (firstLook && !bannerConfig.isNewUnitApplied() && sdkConfig?.prebid?.firstLook == 1) ||
                 (firstLook && bannerConfig.isNewUnitApplied() && sdkConfig?.prebid?.other == 1) ||

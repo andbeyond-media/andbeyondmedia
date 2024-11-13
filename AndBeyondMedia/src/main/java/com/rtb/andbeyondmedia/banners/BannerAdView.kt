@@ -1,7 +1,6 @@
 package com.rtb.andbeyondmedia.banners
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
@@ -788,9 +787,7 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             if (lifecycle == null) {
                 lifecycle = ((mContext as? AppCompatActivity) ?: (mContext as? ComponentActivity))?.lifecycle
             }
-            (mContext as? Activity)?.let {
-                AndBeyondMedia.registerActivity(it)
-            }
+            AndBeyondMedia.registerActivity(mContext)
 
             lifecycle?.addObserver(object : LifecycleEventObserver {
                 override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {

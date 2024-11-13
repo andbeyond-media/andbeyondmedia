@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.rtb.andbeyondmedia.appopen.AppOpenAdManager
 import com.rtb.andbeyondmedia.sdk.ABMError
+import com.rtb.andbeyondmedia.sdk.AndBeyondMedia
 import com.rtb.andbeyondmedia.sdk.FullScreenContentCallback
 
 class ThisApplication : Application() {
@@ -20,6 +21,7 @@ class ThisApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AndBeyondMedia.initialize(this, true)
         lifeCyclerHandler = ActivityLifecycleHandler()
         registerActivityLifecycleCallbacks(lifeCyclerHandler)
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifeCyclerHandler)

@@ -44,6 +44,7 @@ class AppOpenAdManager(private val context: Context, private val adUnit: String?
     var isShowingAd = false
 
     init {
+        AndBeyondMedia.registerActivity(context)
         sdkConfig = ConfigProvider.getConfig(context)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }

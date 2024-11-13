@@ -90,13 +90,13 @@ internal object ConfigProvider {
         }
     }
 
-    internal fun getConfig(context: Context): SDKConfig? {
-        if (cachedConfig == null) {
+    internal fun getConfig(context: Context, restart: Boolean = true): SDKConfig? {
+        if (cachedConfig == null && restart) {
             val constraints = Constraints.Builder().build()
             val inputData = Data.Builder().putBoolean("IS_CONFIG", true).build()
             val workRequest = OneTimeWorkRequestBuilder<FileReadWorker>().setConstraints(constraints).setInputData(inputData).build()
             val workManager = getWorkManager(context)
-            workManager.enqueueUniqueWork(FileReadWorker::class.java.simpleName, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
+            workManager.enqueueUniqueWork(FileReadWorker::class.java.simpleName, ExistingWorkPolicy.KEEP, workRequest)
         }
         return cachedConfig
     }
@@ -105,13 +105,13 @@ internal object ConfigProvider {
         cachedConfig = sdkConfig
     }
 
-    fun getDetectedCountry(context: Context): CountryModel? {
-        if (cachedCountryConfig == null) {
+    fun getDetectedCountry(context: Context, restart: Boolean = true): CountryModel? {
+        if (cachedCountryConfig == null && restart) {
             val constraints = Constraints.Builder().build()
             val inputData = Data.Builder().putBoolean("IS_CONFIG", false).build()
             val workRequest = OneTimeWorkRequestBuilder<FileReadWorker>().setConstraints(constraints).setInputData(inputData).build()
             val workManager = getWorkManager(context)
-            workManager.enqueueUniqueWork(FileReadWorker::class.java.simpleName, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
+            workManager.enqueueUniqueWork(FileReadWorker::class.java.simpleName, ExistingWorkPolicy.KEEP, workRequest)
         }
         return cachedCountryConfig
     }
@@ -126,12 +126,12 @@ internal class FileReadWorker(private val context: Context, params: WorkerParame
         return try {
             val isConfig = inputData.getBoolean("IS_CONFIG", true)
             if (isConfig) {
-                if (getConfig(context) == null) {
+                if (getConfig(context, false) == null) {
                     val config = readConfig()
                     ConfigProvider.setConfig(config)
                 }
             } else {
-                if (ConfigProvider.getDetectedCountry(context) == null) {
+                if (ConfigProvider.getDetectedCountry(context, false) == null) {
                     val detectedCountry = readDetectedCountry()
                     ConfigProvider.setDetectedCountry(detectedCountry)
                 }
@@ -206,7 +206,6 @@ internal class ConfigFetchWorker(private val context: Context, params: WorkerPar
                 fetchDetectedCountry(countryFetchStatus.url)
             }
             AndBeyondMedia.configFetched(context, config)
-            AndBeyondMedia.fetchedConfig.postValue(true)
         }
         return result
     }

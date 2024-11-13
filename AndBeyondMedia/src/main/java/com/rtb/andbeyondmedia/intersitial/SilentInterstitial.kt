@@ -26,6 +26,9 @@ import com.rtb.andbeyondmedia.sdk.BannerAdListener
 import com.rtb.andbeyondmedia.sdk.ConfigProvider
 import com.rtb.andbeyondmedia.sdk.StoreService
 import com.rtb.andbeyondmedia.sdk.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Date
 
 internal class SilentInterstitial {
@@ -42,7 +45,8 @@ internal class SilentInterstitial {
     private val tag: String
         get() = this.javaClass.simpleName
 
-    fun registerActivity(activity: Activity) {
+    fun registerActivity(activity: Activity) = CoroutineScope(Dispatchers.Default).launch {
+        activities = activities.filter { !it.isDestroyed && !it.isFinishing } as ArrayList<Activity>
         if (activities.none { it.localClassName == activity.localClassName }) {
             tag.log { activity.localClassName }
             activities.add(activity)
@@ -168,7 +172,7 @@ internal class SilentInterstitial {
         resumeCounter()
     }
 
-    private fun findContext(): Activity? {
+    internal fun findContext(): Activity? {
         if (activities.isEmpty()) return null
         return try {
             activities = activities.filter { !it.isDestroyed && !it.isFinishing } as ArrayList<Activity>

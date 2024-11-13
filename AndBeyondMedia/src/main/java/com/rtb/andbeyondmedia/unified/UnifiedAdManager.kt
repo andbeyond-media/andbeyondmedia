@@ -51,6 +51,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     private var customAdFormatIds: List<String> = arrayListOf()
 
     init {
+        AndBeyondMedia.registerActivity(context)
         sdkConfig = ConfigProvider.getConfig(context)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }
@@ -464,6 +465,7 @@ class UnifiedAdManager(private val context: Context, private val adUnit: String)
     }
 
     private fun fetchDemand(adRequest: AdManagerAdRequest, callback: () -> Unit) {
+        AndBeyondMedia.initPrebid()
         if (sdkConfig?.prebid?.whitelistedFormats != null && sdkConfig?.prebid?.whitelistedFormats?.contains(AdTypes.NATIVE) == false) {
             callback()
             return

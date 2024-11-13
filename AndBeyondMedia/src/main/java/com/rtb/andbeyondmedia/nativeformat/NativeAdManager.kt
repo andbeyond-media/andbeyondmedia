@@ -54,6 +54,7 @@ class NativeAdManager(private val context: Context, private val adUnit: String) 
     var owTestMode: Boolean? = null
 
     init {
+        AndBeyondMedia.registerActivity(context)
         sdkConfig = ConfigProvider.getConfig(context)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
     }

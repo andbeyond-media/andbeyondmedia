@@ -59,6 +59,7 @@ internal class InterstitialAdManager(private val context: Activity, private val 
     var owTestMode: Boolean? = null
 
     init {
+        AndBeyondMedia.registerActivity(context)
         sdkConfig = ConfigProvider.getConfig(context)
         shouldBeActive = !(sdkConfig == null || sdkConfig?.switch != 1)
         countryData = ConfigProvider.getDetectedCountry(context)

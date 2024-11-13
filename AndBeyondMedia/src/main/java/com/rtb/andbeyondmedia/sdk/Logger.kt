@@ -17,6 +17,10 @@ internal fun Logger.log(tag: String = TAG, msg: String) {
     }
 }
 
+internal fun log(msg: String) {
+    Log.i("ABM", msg)
+}
+
 internal fun log(getMessage: () -> String) {
     if (!AndBeyondMedia.specialTag.isNullOrEmpty()) {
         try {
