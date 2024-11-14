@@ -179,19 +179,23 @@ internal class ConfigFetchWorker(private val context: Context, params: WorkerPar
     override suspend fun doWork(): Result {
         var config: SDKConfig? = null
         val result = try {
+            log("Fetching config for ${context.packageName}")
             val configService = ConfigProvider.getConfigService()
             val response = configService.getConfig(context.packageName).execute()
             if (response.isSuccessful && response.body() != null) {
                 config = response.body()
                 ConfigProvider.setConfig(config)
                 store(config)
+                log("Config fetched successfully.")
                 Result.success()
             } else {
+                log("Failed softly to fetch config.")
                 config = read()
                 ConfigProvider.setConfig(config)
                 Result.success()
             }
         } catch (e: Throwable) {
+            log("Failed hard to fetch config")
             Logger.ERROR.log(msg = e.message ?: "")
             config = read()
             ConfigProvider.setConfig(config)
