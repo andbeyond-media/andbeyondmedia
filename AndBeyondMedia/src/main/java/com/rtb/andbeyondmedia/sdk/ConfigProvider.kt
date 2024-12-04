@@ -14,7 +14,9 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.checkForSilentInterstitial
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.getStoreService
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.getWorkManager
 import com.rtb.andbeyondmedia.sdk.ConfigProvider.getConfig
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.Call
@@ -69,8 +71,8 @@ internal object ConfigProvider {
         return countryService as CountryService
     }
 
-    internal fun fetchConfig(context: Context, delay: Long? = null) {
-        if (delay != null && delay < 900) return
+    internal fun fetchConfig(context: Context, delay: Long? = null) = CoroutineScope(Dispatchers.IO).launch {
+        if (delay != null && delay < 900) return@launch
         try {
             val constraints = Constraints.Builder().build()
             val workerRequest: OneTimeWorkRequest = delay?.let {

@@ -445,12 +445,16 @@ class BannerAdView : LinearLayout, BannerManagerListener {
             }
         }
         if (firstLook) {
-            bannerManager.shouldSetConfig {
-                if (it) {
-                    bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType, section)
-                    adRequest = bannerManager.checkOverride() ?: adRequest
-                    bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.GAM, adView, true) }
+            try {
+                bannerManager.shouldSetConfig {
+                    if (it) {
+                        bannerManager.setConfig(currentAdUnit, currentAdSizes as ArrayList<AdSize>, adType, section)
+                        adRequest = bannerManager.checkOverride() ?: adRequest
+                        bannerManager.checkGeoEdge(true) { addGeoEdge(AdSdk.GAM, adView, true) }
+                    }
+                    load()
                 }
+            } catch (_: Throwable) {
                 load()
             }
         } else {

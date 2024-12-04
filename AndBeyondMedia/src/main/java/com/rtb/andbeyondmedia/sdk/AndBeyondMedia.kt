@@ -46,15 +46,18 @@ object AndBeyondMedia {
     private var workManager: WorkManager? = null
     internal var logEnabled = false
     internal var specialTag: String? = null
-    private var silentInterstitial = SilentInterstitial()
-    internal var networkManager = NetworkManager()
+    private var silentInterstitial: SilentInterstitial? = null
+    internal var networkManager: NetworkManager? = null
 
     @MainThread
     fun initialize(context: Context, logsEnabled: Boolean = false) {
         log("ABM Version ${BuildConfig.ADAPTER_VERSION} initialized.")
         attachEventHandler(context)
         this.logEnabled = logsEnabled
-        networkManager.register(context)
+        if (networkManager == null) {
+            networkManager = NetworkManager()
+        }
+        networkManager?.register(context)
         ConfigProvider.fetchConfig(context)
     }
 
@@ -75,7 +78,7 @@ object AndBeyondMedia {
     }
 
     internal fun connectionAvailable(): Boolean {
-        return networkManager.isInternetAvailable
+        return networkManager?.isInternetAvailable == true
     }
 
     internal fun configFetched(context: Context, config: SDKConfig?) {
@@ -87,25 +90,34 @@ object AndBeyondMedia {
     }
 
     internal fun initPrebid() {
-        silentInterstitial.findContext()?.let { activity ->
-            if (!(activity.isDestroyed && activity.isFinishing)) {
-                val config = ConfigProvider.getConfig(activity)
-                if (config != null && config.switch == 1) {
-                    initializePrebid(activity, config.prebid)
+        silentInterstitial?.findContext()?.let { activity ->
+            try {
+                if (!(activity.isDestroyed && activity.isFinishing)) {
+                    val config = ConfigProvider.getConfig(activity)
+                    if (config != null && config.switch == 1) {
+                        initializePrebid(activity, config.prebid)
+                    }
                 }
+            } catch (_: Throwable) {
             }
         }
     }
 
-    internal fun registerActivity(context: Context) {
+    internal fun registerActivity(context: Context) = CoroutineScope(Dispatchers.IO).launch {
+        if (silentInterstitial == null) {
+            silentInterstitial = SilentInterstitial()
+        }
         (context as? Activity)?.let {
-            silentInterstitial.registerActivity(it)
+            silentInterstitial?.registerActivity(it)
         }
     }
 
     internal fun checkForSilentInterstitial(context: Context, silentInterstitialConfig: SilentInterstitialConfig?, countryConfig: CountryModel?) {
+        if (silentInterstitial == null) {
+            silentInterstitial = SilentInterstitial()
+        }
         if (silentInterstitialConfig == null) {
-            silentInterstitial.destroy()
+            silentInterstitial?.destroy()
             return
         }
         val shouldStart: Boolean
@@ -125,7 +137,7 @@ object AndBeyondMedia {
         }
         val number = (1..100).random()
         if (shouldStart && number in 1..(silentInterstitialConfig.activePercentage ?: 0)) {
-            silentInterstitial.init(context)
+            silentInterstitial?.init(context)
         }
     }
 }
