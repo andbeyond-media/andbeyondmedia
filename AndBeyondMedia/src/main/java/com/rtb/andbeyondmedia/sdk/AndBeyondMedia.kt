@@ -6,7 +6,6 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import androidx.annotation.MainThread
 import androidx.work.WorkManager
 import com.amazon.device.ads.AdRegistration
 import com.amazon.device.ads.DTBAdNetwork
@@ -16,6 +15,7 @@ import com.appharbr.sdk.configuration.AHSdkConfiguration
 import com.appharbr.sdk.engine.AppHarbr
 import com.appharbr.sdk.engine.InitializationFailureReason
 import com.appharbr.sdk.engine.listeners.OnAppHarbrInitializationCompleteListener
+import com.github.anrwatchdog.ANRWatchDog
 import com.google.android.gms.ads.MobileAds
 import com.pubmatic.sdk.common.OpenWrapSDK
 import com.pubmatic.sdk.common.models.POBApplicationInfo
@@ -33,6 +33,7 @@ import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.prebid.mobile.Host
 import org.prebid.mobile.PrebidMobile
 import org.prebid.mobile.TargetingParams
@@ -49,11 +50,11 @@ object AndBeyondMedia {
     private var silentInterstitial: SilentInterstitial? = null
     internal var networkManager: NetworkManager? = null
 
-    @MainThread
-    fun initialize(context: Context, logsEnabled: Boolean = false) {
+    fun initialize(context: Context, logsEnabled: Boolean = false) = CoroutineScope(Dispatchers.IO).launch {
         log("ABM Version ${BuildConfig.ADAPTER_VERSION} initialized.")
         attachEventHandler(context)
-        this.logEnabled = logsEnabled
+        EventHelper.attachAnrWatchDog()
+        this@AndBeyondMedia.logEnabled = logsEnabled
         if (networkManager == null) {
             networkManager = NetworkManager()
         }
@@ -81,7 +82,7 @@ object AndBeyondMedia {
         return networkManager?.isInternetAvailable == true
     }
 
-    internal fun configFetched(context: Context, config: SDKConfig?) {
+    internal suspend fun configFetched(context: Context, config: SDKConfig?) = withContext(Dispatchers.IO) {
         specialTag = config?.infoConfig?.specialTag
         logEnabled = (logEnabled || config?.infoConfig?.normalInfo == 1)
         attachSentry(context, config?.events)
@@ -144,11 +145,15 @@ object AndBeyondMedia {
 
 internal object EventHelper {
 
-    fun attachEventHandler(context: Context) {
+    suspend fun attachEventHandler(context: Context) = withContext(Dispatchers.IO) {
         Thread.setDefaultUncaughtExceptionHandler(EventHandler(context, Thread.getDefaultUncaughtExceptionHandler()))
     }
 
-    fun attachSentry(context: Context, events: SDKConfig.Events?) {
+    suspend fun attachAnrWatchDog() = withContext(Dispatchers.IO) {
+        ANRWatchDog(10000).start()
+    }
+
+    suspend fun attachSentry(context: Context, events: SDKConfig.Events?) = withContext(Dispatchers.IO) {
         val sentryInitPercentage = events?.sentry ?: 100
         if (shouldHandle(sentryInitPercentage) && !Sentry.isEnabled()) {
             SentryAndroid.init(context) { options ->
@@ -199,7 +204,7 @@ internal object EventHelper {
 @Suppress("UNNECESSARY_SAFE_CALL")
 internal object SDKManager {
 
-    fun initialize(context: Context, config: SDKConfig?) {
+    suspend fun initialize(context: Context, config: SDKConfig?) {
         initializeGAM(context)
         if (config == null || config.switch != 1) return
         initializeGeoEdge(context, config.geoEdge?.apiKey)
@@ -244,14 +249,14 @@ internal object SDKManager {
         }
     }
 
-    private fun initializeGAM(context: Context) = CoroutineScope(Dispatchers.IO).launch {
+    private suspend fun initializeGAM(context: Context) = withContext(Dispatchers.IO) {
         MobileAds.initialize(context) {
             Logger.INFO.log(msg = "GAM Initialization complete.")
         }
     }
 
-    private fun initializeGeoEdge(context: Context, apiKey: String?) {
-        if (apiKey.isNullOrEmpty()) return
+    private suspend fun initializeGeoEdge(context: Context, apiKey: String?) = withContext(Dispatchers.IO) {
+        if (apiKey.isNullOrEmpty()) return@withContext
         val configuration = AHSdkConfiguration.Builder(apiKey).build()
         AppHarbr.initialize(context, configuration, object : OnAppHarbrInitializationCompleteListener {
             override fun onSuccess() {
@@ -265,8 +270,8 @@ internal object SDKManager {
         })
     }
 
-    private fun initializeAPS(context: Context, aps: SDKConfig.Aps?) {
-        if (aps?.appKey.isNullOrEmpty()) return
+    private suspend fun initializeAPS(context: Context, aps: SDKConfig.Aps?) = withContext(Dispatchers.IO) {
+        if (aps?.appKey.isNullOrEmpty()) return@withContext
         fun init() {
             AdRegistration.getInstance(aps?.appKey ?: "", context)
             AdRegistration.setAdNetworkInfo(DTBAdNetworkInfo(DTBAdNetwork.GOOGLE_AD_MANAGER))
@@ -289,8 +294,8 @@ internal object SDKManager {
         }
     }
 
-    private fun initializeOpenWrap(owConfig: SDKConfig.OpenWrapConfig?) {
-        if (owConfig?.playStoreUrl.isNullOrEmpty()) return
+    private suspend fun initializeOpenWrap(owConfig: SDKConfig.OpenWrapConfig?) = withContext(Dispatchers.IO) {
+        if (owConfig?.playStoreUrl.isNullOrEmpty()) return@withContext
         val appInfo = POBApplicationInfo()
         try {
             appInfo.storeURL = URL(owConfig?.playStoreUrl ?: "")

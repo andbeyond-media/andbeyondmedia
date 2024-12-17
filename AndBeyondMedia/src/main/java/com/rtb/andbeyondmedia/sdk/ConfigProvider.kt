@@ -14,9 +14,7 @@ import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.checkForSilentInterstitial
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.getStoreService
 import com.rtb.andbeyondmedia.sdk.AndBeyondMedia.getWorkManager
 import com.rtb.andbeyondmedia.sdk.ConfigProvider.getConfig
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.Call
@@ -71,8 +69,8 @@ internal object ConfigProvider {
         return countryService as CountryService
     }
 
-    internal fun fetchConfig(context: Context, delay: Long? = null) = CoroutineScope(Dispatchers.IO).launch {
-        if (delay != null && delay < 900) return@launch
+    internal suspend fun fetchConfig(context: Context, delay: Long? = null) = withContext(Dispatchers.IO) {
+        if (delay != null && delay < 900) return@withContext
         try {
             val constraints = Constraints.Builder().build()
             val workerRequest: OneTimeWorkRequest = delay?.let {
@@ -150,7 +148,9 @@ internal class FileReadWorker(private val context: Context, params: WorkerParame
                 val configFile = File(context.applicationContext.filesDir, Files.CONFIG_FILE)
                 if (configFile.exists()) {
                     val ois = ObjectInputStream(FileInputStream(configFile))
-                    ois.readObject() as? SDKConfig
+                    val config = ois.readObject() as? SDKConfig
+                    ois.close()
+                    config
                 } else {
                     null
                 }
@@ -166,7 +166,9 @@ internal class FileReadWorker(private val context: Context, params: WorkerParame
                 val configFile = File(context.applicationContext.filesDir, Files.COUNTRY_CONFIG_FILE)
                 if (configFile.exists()) {
                     val ois = ObjectInputStream(FileInputStream(configFile))
-                    ois.readObject() as? CountryModel
+                    val country = ois.readObject() as? CountryModel
+                    ois.close()
+                    country
                 } else {
                     null
                 }

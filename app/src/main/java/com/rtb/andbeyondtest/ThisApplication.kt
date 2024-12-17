@@ -3,6 +3,7 @@ package com.rtb.andbeyondtest
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.os.StrictMode
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -20,6 +21,7 @@ class ThisApplication : Application() {
 
 
     override fun onCreate() {
+        startStrictMode()
         super.onCreate()
         AndBeyondMedia.initialize(this, true)
         lifeCyclerHandler = ActivityLifecycleHandler()
@@ -27,6 +29,21 @@ class ThisApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifeCyclerHandler)
         appOpenAdManager = AppOpenAdManager(this, adUnitId)
         appOpenAdManager.fullScreenContentCallback = fullScreenContentCallback
+    }
+
+    private fun startStrictMode() {
+        StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .build())
+        StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder()
+                .detectLeakedSqlLiteObjects()
+                .detectLeakedClosableObjects()
+                .penaltyLog()
+                .penaltyDeath()
+                .build())
     }
 
     fun showAdIfAvailable(activity: Activity) {
@@ -59,7 +76,7 @@ class ThisApplication : Application() {
 
         override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
             if (event == Lifecycle.Event.ON_START) {
-              //  currentActivity?.let { showAdIfAvailable(it) }
+                //  currentActivity?.let { showAdIfAvailable(it) }
             }
         }
 

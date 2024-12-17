@@ -5,15 +5,14 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class NetworkManager() : ConnectivityManager.NetworkCallback() {
 
     var isInternetAvailable: Boolean = true
 
-    fun register(context: Context) = CoroutineScope(Dispatchers.IO).launch {
+    suspend fun register(context: Context) = withContext(Dispatchers.IO) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 (context.getSystemService(Activity.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.registerDefaultNetworkCallback(this@NetworkManager)

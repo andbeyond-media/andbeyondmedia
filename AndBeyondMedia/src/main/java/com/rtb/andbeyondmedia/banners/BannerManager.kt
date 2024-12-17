@@ -155,7 +155,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
     }
 
     @Suppress("UNNECESSARY_SAFE_CALL")
-    fun shouldSetConfig(callback: (Boolean) -> Unit) {
+    fun shouldSetConfig(callback: (Boolean) -> Unit) = CoroutineScope(Dispatchers.Main).launch {
         var actualCallback: ((Boolean) -> Unit)? = callback
         val workManager = AndBeyondMedia.getWorkManager(context)
         val workers = workManager.getWorkInfosForUniqueWork(ConfigFetchWorker::class.java.simpleName).get()
@@ -184,7 +184,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         Handler(Looper.getMainLooper()).postDelayed({
             actualCallback?.invoke(false)
             actualCallback = null
-        }, 4000)
+        }, 2000)
     }
 
     fun setSudoConfig(sdkConfig: SDKConfig?) {
@@ -492,14 +492,18 @@ internal class BannerManager(private val context: Context, private val bannerLis
         activeTimeCounter?.cancel()
         activeTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                if (bannerConfig.isVisible == true) {
-                    bannerConfig.isVisibleFor++
+                CoroutineScope(Dispatchers.IO).launch {
+                    if (bannerConfig.isVisible == true) {
+                        bannerConfig.isVisibleFor++
+                    }
+                    bannerConfig.activeRefreshInterval--
                 }
-                bannerConfig.activeRefreshInterval--
             }
 
             override fun onFinish() {
-                bannerConfig.activeRefreshInterval = sdkConfig?.activeRefreshInterval ?: 0
+                CoroutineScope(Dispatchers.IO).launch {
+                    bannerConfig.activeRefreshInterval = sdkConfig?.activeRefreshInterval ?: 0
+                }
                 refresh(1)
             }
         }
@@ -511,11 +515,15 @@ internal class BannerManager(private val context: Context, private val bannerLis
         passiveTimeCounter?.cancel()
         passiveTimeCounter = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                bannerConfig.passiveRefreshInterval--
+                CoroutineScope(Dispatchers.IO).launch {
+                    bannerConfig.passiveRefreshInterval--
+                }
             }
 
             override fun onFinish() {
-                bannerConfig.passiveRefreshInterval = sdkConfig?.passiveRefreshInterval ?: 0
+                CoroutineScope(Dispatchers.IO).launch {
+                    bannerConfig.passiveRefreshInterval = sdkConfig?.passiveRefreshInterval ?: 0
+                }
                 refresh(0)
             }
         }
