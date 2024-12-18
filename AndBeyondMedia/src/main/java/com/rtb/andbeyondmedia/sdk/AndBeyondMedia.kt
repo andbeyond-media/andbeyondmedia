@@ -150,7 +150,7 @@ internal object EventHelper {
     }
 
     suspend fun attachAnrWatchDog() = withContext(Dispatchers.IO) {
-        ANRWatchDog(10000).start()
+        ANRWatchDog(7000).start()
     }
 
     suspend fun attachSentry(context: Context, events: SDKConfig.Events?) = withContext(Dispatchers.IO) {
