@@ -184,7 +184,7 @@ internal class BannerManager(private val context: Context, private val bannerLis
         Handler(Looper.getMainLooper()).postDelayed({
             actualCallback?.invoke(false)
             actualCallback = null
-        }, 2500)
+        }, 3000)
     }
 
     fun setSudoConfig(sdkConfig: SDKConfig?) {
