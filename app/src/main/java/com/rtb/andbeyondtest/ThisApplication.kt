@@ -42,7 +42,6 @@ class ThisApplication : Application() {
                 .detectLeakedSqlLiteObjects()
                 .detectLeakedClosableObjects()
                 .penaltyLog()
-                .penaltyDeath()
                 .build())
     }
 

@@ -758,7 +758,11 @@ class AdMobBannerAdView : LinearLayout, BannerManagerListener {
                 pendingAttach = false
                 onAdLoaded()
                 onAdImpression()
-                adView.tag = ""
+                if (this@AdMobBannerAdView::adView.isInitialized) {
+                    adView.tag = ""
+                } else {
+                    adMobView.tag = ""
+                }
             }
         }
 

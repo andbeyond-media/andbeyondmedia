@@ -11,7 +11,6 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.telephony.TelephonyManager
-import android.util.Log
 import android.view.View
 import android.webkit.WebView
 import androidx.lifecycle.Observer
@@ -629,7 +628,6 @@ internal class AdMobBannerManager(private val context: Context, private val bann
                 }
             }
         }
-        Log.d("Sonu", "refresh: ${AndBeyondMedia.connectionAvailable()}, ${isForegroundRefresh == 1}, ${(unfilled || takeOpportunity)}, ${canRefresh()}")
 
         if (AndBeyondMedia.connectionAvailable() == true && isForegroundRefresh == 1 && (unfilled || takeOpportunity) && canRefresh()) {
             refreshAd()
@@ -639,7 +637,6 @@ internal class AdMobBannerManager(private val context: Context, private val bann
     }
 
     private fun canRefresh(): Boolean {
-        Log.d("Sonu", "canRefresh: ${sdkConfig?.forceImpression != 1}, ${pendingImpression}")
         return if (sdkConfig?.forceImpression != 1) {
             true
         } else !pendingImpression

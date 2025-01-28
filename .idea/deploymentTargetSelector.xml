@@ -4,7 +4,7 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-12-04T17:20:08.699481500Z">
+        <DropdownSelection timestamp="2025-01-28T18:22:33.250547Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="PhysicalDevice" identifier="serial=096363135N040031" />
@@ -15,17 +15,12 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="PhysicalDevice" identifier="serial=RZCX119RBYZ" />
-              </handle>
-            </Target>
-            <Target type="DEFAULT_BOOT">
-              <handle>
                 <DeviceId pluginId="PhysicalDevice" identifier="serial=096363135N040031" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=/Users/sonusony/.android/avd/Pixel_5_33_13_.avd" />
+                <DeviceId pluginId="LocalEmulator" identifier="path=/Users/sonusony/.android/avd/Pixel_5_14_34.avd" />
               </handle>
             </Target>
           </targets>
