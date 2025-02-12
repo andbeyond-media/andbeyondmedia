@@ -69,20 +69,11 @@ internal object ConfigProvider {
         return countryService as CountryService
     }
 
-    internal suspend fun fetchConfig(context: Context, delay: Long? = null) = withContext(Dispatchers.IO) {
-        if (delay != null && delay < 900) return@withContext
+    internal suspend fun fetchConfig(context: Context) = withContext(Dispatchers.IO) {
         try {
             val constraints = Constraints.Builder().build()
-            val workerRequest: OneTimeWorkRequest = delay?.let {
-                OneTimeWorkRequestBuilder<ConfigFetchWorker>().setConstraints(constraints).setInitialDelay(it, TimeUnit.SECONDS).build()
-            } ?: kotlin.run {
-                OneTimeWorkRequestBuilder<ConfigFetchWorker>().setConstraints(constraints).build()
-            }
-            val workName: String = delay?.let {
-                String.format("%s_%s", ConfigFetchWorker::class.java.simpleName, it.toString())
-            } ?: kotlin.run {
-                ConfigFetchWorker::class.java.simpleName
-            }
+            val workerRequest: OneTimeWorkRequest = OneTimeWorkRequestBuilder<ConfigFetchWorker>().setConstraints(constraints).build()
+            val workName: String = ConfigFetchWorker::class.java.simpleName
             val workManager = getWorkManager(context)
             workManager.enqueueUniqueWork(workName, ExistingWorkPolicy.REPLACE, workerRequest)
         } catch (_: Throwable) {
@@ -206,9 +197,6 @@ internal class ConfigFetchWorker(private val context: Context, params: WorkerPar
             Result.success()
         }
         withContext(Dispatchers.Main) {
-            if (config?.refetch != null) {
-                ConfigProvider.fetchConfig(context, config.refetch)
-            }
             val countryFetchStatus = config?.countryStatus
             if (countryFetchStatus?.active == 1 && !countryFetchStatus.url.isNullOrEmpty()) {
                 fetchDetectedCountry(countryFetchStatus.url)
