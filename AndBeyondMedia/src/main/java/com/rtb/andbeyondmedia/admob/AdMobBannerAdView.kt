@@ -467,7 +467,7 @@ class AdMobBannerAdView : LinearLayout, BannerManagerListener {
                 if (this::adMobView.isInitialized) {
                     log { "loadAd&load : ${adRequest.customTargeting}" }
                     isRefreshLoaded = adRequest.customTargeting.containsKey("refresh") && adRequest.customTargeting.getString("retry") != "1" && adRequest.customTargeting.getString("new_unit") != "1"
-                    bannerManager.fetchDemand(firstLook, adRequest) { adMobView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build()) }
+                    bannerManager.fetchDemand(firstLook, adRequest) { adMobView.loadAd(request.getAdMobRequest() ?: return@fetchDemand) }
                 }
             } else {
                 if (this::adView.isInitialized) {

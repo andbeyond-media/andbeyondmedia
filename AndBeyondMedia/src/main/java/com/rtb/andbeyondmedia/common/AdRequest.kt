@@ -16,6 +16,18 @@ class AdRequest {
         }
     }
 
+    internal fun getAdMobRequest(): com.google.android.gms.ads.AdRequest? {
+        return getAdRequest()?.let {
+            com.google.android.gms.ads.AdRequest.Builder().apply {
+                it.adString?.let { a -> setAdString(a) }
+                it.contentUrl?.let { a -> setContentUrl(a) }
+                it.requestAgent?.let { a -> setRequestAgent(a) }
+                it.neighboringContentUrls?.let { a -> setNeighboringContentUrls(a) }
+                it.keywords.firstOrNull()?.let { a -> addKeyword(a) }
+            }.build()
+        }
+    }
+
     fun getBuilder() = Builder()
 
     @SuppressLint("VisibleForTests")
